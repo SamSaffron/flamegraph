@@ -20,6 +20,22 @@ Or install it yourself as:
 
 Note: Only supported on Ruby 2.0. Gathering stack traces is too slow on earlier versions of Ruby or JRuby
 
+```ruby
+
+require 'flamegraph'
+html = Flamegraph.generate do
+  # your work here
+end
+
+# or
+
+
+Flamegraph.generate(filename) do
+  # your work here
+end
+
+```
+
 ## Contributing
 
 1. Fork it
