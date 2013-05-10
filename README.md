@@ -36,6 +36,17 @@ end
 
 ```
 
+## Demo
+
+Demo of: https://github.com/SamSaffron/flamegraph/blob/master/demo/demo.rb
+
+http://samsaffron.github.io/flamegraph/demo.html
+
+Demo of Discourse startup using: https://github.com/SamSaffron/flamegraph/blob/master/demo/rails_startup.rb
+
+**WARNING VERY SLOW, MAY CRASH BROWSER TAB**
+http://samsaffron.github.io/flamegraph/rails-startup.html
+
 ## Contributing
 
 1. Fork it
