@@ -1,4 +1,5 @@
 require 'test_helper'
+require 'flamegraph/sampler'
 
 class TestSampler < Minitest::Test
 

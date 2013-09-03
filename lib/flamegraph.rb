@@ -1,7 +1,6 @@
 require "json"
 require "fast_stack"
 require "flamegraph/version"
-require "flamegraph/sampler"
 require "flamegraph/renderer"
 
 module Flamegraph

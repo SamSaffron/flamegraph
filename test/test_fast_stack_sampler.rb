@@ -1,5 +1,6 @@
 require 'test_helper'
 require 'fast_stack'
+require 'flamegraph/fast_stack_sampler'
 
 class TestFastStackSampler < Minitest::Test
 
