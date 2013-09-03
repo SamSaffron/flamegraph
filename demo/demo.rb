@@ -11,9 +11,9 @@ def ack(m, n)
   end
 end
 
-graph = Flamegraph.generate do
-  ack(3,7)
-end
+# graph = Flamegraph.generate do
+#   ack(3,7)
+# end
 
 Flamegraph.generate("graph.html") do
   ack(3,7)
