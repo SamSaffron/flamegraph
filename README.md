@@ -1,6 +1,9 @@
 # Flamegraph
 
-Flamegraph support for arbitrary Ruby apps
+Flamegraph support for arbitrary Ruby apps.
+
+Note, flamegraph support is built in to rack-mini-profiler, just require this gem and you should be good to go. 
+Type ?pp=flamegraph to create one for the current page.
 
 ## Installation
 
