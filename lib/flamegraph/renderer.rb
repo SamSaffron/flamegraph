@@ -9,7 +9,7 @@ class Flamegraph::Renderer
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        "<script>" << read("jquery.min.js") << "  " << read("d3.min.js") << " " << read("lodash.min.js") << "</script>"
+        embed("jquery.js","d3.min.js","lodash.min.js")
       else
         '<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.0.8/d3.min.js"></script>
@@ -67,6 +67,15 @@ class Flamegraph::Renderer
   end
 
   private
+
+  def embed(*files)
+    out = ""
+    files.each do |file|
+      body = read(file)
+      out << "<script>" << body << "</script>"
+    end
+    out
+  end
 
   def read(file)
     body = IO.read(::File.expand_path(file, ::File.dirname(__FILE__)))
