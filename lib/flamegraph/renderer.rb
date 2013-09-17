@@ -1,4 +1,5 @@
 # inspired by https://github.com/brendangregg/FlameGraph
+require 'base64'
 
 class Flamegraph::Renderer
   def initialize(stacks)
@@ -9,7 +10,7 @@ class Flamegraph::Renderer
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        embed("jquery.js","d3.min.js","lodash.min.js")
+        embed("jquery.min.js","d3.min.js","lodash.min.js")
       else
         '<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.0.8/d3.min.js"></script>
@@ -72,7 +73,7 @@ class Flamegraph::Renderer
     out = ""
     files.each do |file|
       body = read(file)
-      out << "<script>" << body << "</script>"
+      out << "<script src='data:text/javascript;base64," << Base64.encode64(body) << "'></script>"
     end
     out
   end
