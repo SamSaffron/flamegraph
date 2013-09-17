@@ -5,9 +5,18 @@ class Flamegraph::Renderer
     @stacks = stacks
   end
 
-  def graph_html
-    body = IO.read(::File.expand_path('flamegraph.html', ::File.dirname(__FILE__)))
-    body.sub!("/*DATA*/", ::JSON.generate(graph_data));
+  def graph_html(embed_resources)
+    body = read('flamegraph.html')
+    body.sub! "/**INCLUDES**/",
+      if embed_resources
+        "<script>" << read("jquery.min.js") << "  " << read("d3.min.js") << " " << read("lodash.min.js") << "</script>"
+      else
+        '<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.0.8/d3.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/lodash.js/1.3.1/lodash.min.js"></script>'
+      end
+
+    body.sub!("/**DATA**/", ::JSON.generate(graph_data));
     body
   end
 
@@ -55,6 +64,12 @@ class Flamegraph::Renderer
     end
 
     data
+  end
+
+  private
+
+  def read(file)
+    body = IO.read(::File.expand_path(file, ::File.dirname(__FILE__)))
   end
 
 end

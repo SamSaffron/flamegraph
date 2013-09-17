@@ -11,8 +11,10 @@ module Flamegraph
       yield
     end
 
+    embed_resources = filename && !opts.key?(:embed_resources)
+
     renderer = Flamegraph::Renderer.new(backtraces)
-    rendered = renderer.graph_html
+    rendered = renderer.graph_html(embed_resources)
 
     if filename
       File.open(filename,"w") do |f|

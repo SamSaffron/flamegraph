@@ -6,3 +6,9 @@
 
 - 0.0.3
 - Corrected analysis of gem file name, ensured gems are ordered by usage
+
+17-Sep-2013
+
+- 0.0.4
+- When generating a local report embed all assets
+- Show stack depth
