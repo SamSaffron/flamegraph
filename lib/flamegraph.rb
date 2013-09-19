@@ -11,7 +11,7 @@ module Flamegraph
       yield
     end
 
-    embed_resources = filename && !opts.key?(:embed_resources)
+    embed_resources = (filename && !opts.key?(:embed_resources)) || opts[:embed_resources]
 
     renderer = Flamegraph::Renderer.new(backtraces)
     rendered = renderer.graph_html(embed_resources)

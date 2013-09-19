@@ -11,4 +11,7 @@
 
 - 0.0.4
 - When generating a local report embed all assets
-- Show stack depth
+
+19-Sep-2013
+- Bug with the embed_resources not picking up
+- 0.0.5
