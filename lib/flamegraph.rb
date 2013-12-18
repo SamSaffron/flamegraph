@@ -7,7 +7,7 @@ module Flamegraph
   def self.generate(filename=nil, opts = {})
     fidelity = opts[:fidelity]  || 0.5
 
-    backtraces = FastStack.profile(fidelity) do
+    backtraces = FastStack.profile(fidelity, opts[:mode] || :ruby) do
       yield
     end
 

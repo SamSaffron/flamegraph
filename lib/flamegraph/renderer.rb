@@ -22,13 +22,14 @@ class Flamegraph::Renderer
   end
 
   def graph_data
-    height = 0
-
     table = []
     prev = []
 
     # a 2d array makes collapsing easy
     @stacks.each_with_index do |stack, pos|
+
+      next unless stack
+
       col = []
 
       stack.reverse.map{|r| r.to_s}.each_with_index do |frame, i|
@@ -79,7 +80,7 @@ class Flamegraph::Renderer
   end
 
   def read(file)
-    body = IO.read(::File.expand_path(file, ::File.dirname(__FILE__)))
+    IO.read(::File.expand_path(file, ::File.dirname(__FILE__)))
   end
 
 end
