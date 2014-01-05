@@ -291,7 +291,7 @@ function fontSize(d,i) {
   var height = yScale(1);
   var length = 0;
   d3.select(this).style("font-size", size + "px").text(word);
-  while(((this.getBBox().width >= width) || (this.getBBox().height >= height)) && (size > 12))
+  while((size > 12.1) && ((this.getBBox().width >= width) || (this.getBBox().height >= height)))
    {
     size -= 0.1;
     d3.select(this).style("font-size", size + "px");
