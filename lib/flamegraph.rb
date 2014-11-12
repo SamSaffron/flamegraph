@@ -2,16 +2,17 @@ require "json"
 
 if RUBY_VERSION >= "2.1.0".freeze
   begin
-    require "flamegraph/stackprof_sampler"
     require "stackprof"
+    require "flamegraph/stackprof_sampler"
   rescue
-    STDERR.puts "Please require the fast_stack gem"
+    STDERR.puts "Please require the stackprof gem falling back to fast_stack"
+    require "fast_stack"
   end
 else
   begin
     require "fast_stack"
   rescue
-    STDERR.puts "Please require the stackprof gem, note flamegraph is only supported on Ruby 2.0 and above"
+    STDERR.puts "Please require the fast_stack gem, note flamegraph is only supported on Ruby 2.0 and above"
   end
 end
 
