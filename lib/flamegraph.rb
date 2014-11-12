@@ -3,7 +3,6 @@ require "json"
 if RUBY_VERSION >= "2.1.0".freeze
   begin
     require "stackprof"
-    require "flamegraph/stackprof_sampler"
   rescue
     STDERR.puts "Please require the stackprof gem falling back to fast_stack"
     require "fast_stack"
@@ -25,6 +24,7 @@ module Flamegraph
 
     backtraces =
       if defined? StackProf
+        require "flamegraph/stackprof_sampler" unless defined? StackProfSampler
         StackProfSampler.collect(fidelity) do
           yield
         end
