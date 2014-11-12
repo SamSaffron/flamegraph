@@ -17,3 +17,9 @@
 
 - 0.0.5
 - Correct embed
+
+12-Nov-2014
+
+- 0.0.6
+- Better analysis with stackprof
+- New window displaying the backtrace when clicking on element

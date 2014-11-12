@@ -7,7 +7,7 @@
 
 <title>Flame Graph of Page</title>
 <style>
-  .info {height: 40px;}
+  .info {min-height: 50px; margin: 10px; }
   .legend div {
     display: block;
     float: left;
@@ -16,13 +16,62 @@
     padding: 4px;
     height: 50px;
   }
+  .code {
+    font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
+  }
+  #frameinfo table .sample-info {
+    width: 200px;
+    color: #333;
+    font-size: 12px;
+  }
+  #frameinfo table {
+    border-collapse: collapse;
+  }
+  #frameinfo table tr {
+    border-bottom: 1px solid #eee;
+    margin-top: 5px;
+  }
+  #frameinfo td {
+    padding: 5px;
+  }
+  #frameinfo-wrapper {
+    position: fixed;
+    z-index: 1;
+    opacity: 0.7;
+    background-color: black;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: none;
+  }
+  #frameinfo {
+    position: fixed;
+    padding: 10px;
+    z-index: 2;
+    opacity: 1.0;
+    top: 0;
+    margin-top: 50px;
+    margin-left: 40px;
+    width: 80%;
+    height: 80%;
+    background-color: white;
+    border: 2px solid #666;
+    display: none;
+    overflow: auto;
+  }
 </style>
 </head>
 <body>
   <div class="graph"></div>
-  <div class="info"></div>
+  <div class="info code"></div>
   <div class="legend"></div>
-
+  <div id="frameinfo-wrapper"></div>
+  <div id="frameinfo">
+    <h3>Frame Info</h3>
+    <table>
+    </table>
+  </div>
   <script>
 
 var data = /**DATA**/;
@@ -84,7 +133,12 @@ var guessGem = function(frame)
 var guessMethod = function(frame) {
   var split = frame.split('`');
   if(split.length == 2) {
-    return split[1].split("'")[0];
+    var fullMethod = split[1].split("'")[0];
+    split = fullMethod.split("#");
+    if(split.length == 2) {
+      return split[1];
+    }
+    return split[0];
   }
   return '?';
 }
@@ -101,7 +155,7 @@ var guessFile = function(frame) {
 $.each(data, function(){
    maxX = Math.max(maxX, this.x + this.width);
    maxY = Math.max(maxY, this.y);
-   this.shortName = /* guessGem(this.frame) + " " + guessFile(this.frame) + " "  */ guessMethod(this.frame);
+   this.shortName = guessMethod(this.frame);
 });
 
 var width = $(window).width();
@@ -192,6 +246,87 @@ var mouseout = function(d) {
   $('.info').text("");
   d3.selectAll(i.nodes)
      .attr('opacity',1);
+};
+
+var backtrace = function(frame){
+  for(var i=0; i<data.length; i++){
+    if(frame === data[i]){ break; }
+  }
+
+  frames = [frame];
+  var depth = frame.y;
+
+  while(i > 0){
+    if(depth == -1) break;
+
+    if(data[i].y === depth-1) {
+      frames.push(data[i]);
+      depth--;
+    }
+
+    i--;
+  }
+
+  return frames;
+}
+
+$('#frameinfo-wrapper').click(function(d){
+    $(this).hide();
+    $('#frameinfo').hide();
+});
+
+var click = function(d){
+  var trace = backtrace(d);
+
+  var link = function(path, dest){
+    return path.replace(/[^\/]+:\d+/, function(x){ return "<a target='_blank' href='"+ dest +"'>" + x + "</a>"})
+  };
+
+  var linkify = function(path){
+    var split = path.split("/")[0].split("-");
+    if(["activerecord","actionpack","railties","activesupport", "rails"].indexOf(split[0]) > -1) {
+      var github = "https://github.com/rails/rails/blob/";
+      var file = path.split(":")[0].split("/");
+      if(split[0] === "rails") {
+        file.shift();
+      } else {
+        file[0] = split[0];
+      }
+
+      github += (split[1].length < 6 ? "v" : "") + split[1] + "/";
+      github += file.join("/");
+      github += "#L" + parseInt(path.split(":")[1]);
+
+      return link(path, github);
+    }
+    return path;
+  }
+
+  var simplify = function(frame){
+    var split = frame.split('/gems/');
+    if(split.length > 1){
+      var path = linkify(split.pop());
+      return "<span class='full-location'>" + split.join('/gems/') + "/</span>" + path;
+    } else {
+      return frame;
+    }
+  }
+
+  var table = trace.map(function(f){
+        var i = info[f.frame];
+        return "<tr><td class='code'>" + simplify(f.frame) + "</td><td class='sample-info'>" +
+                samplePercent(i.samples.length, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
+                "</td></tr>";
+      }).join("\n");
+
+  var table = $('#frameinfo table').html(table);
+  table.find(".full-location").hide().after("<span class='expand'>&hellip; </span>");
+  table.find(".expand").css({cursor: "pointer"}).click(function(){
+      $(this).hide().parent().find(".full-location").show();
+  });
+
+  $('#frameinfo-wrapper').show();
+  $('#frameinfo').show();
 };
 
 // http://stackoverflow.com/a/7419630
@@ -323,7 +458,9 @@ svg.selectAll("g")
         return i.color;
       })
       .on("mouseover", mouseover)
-      .on("mouseout", mouseout);
+      .on("mouseout", mouseout)
+      .on("click", click)
+      .attr("cursor", "pointer");
 
       d3.select(this)
         .append("text")
@@ -331,7 +468,9 @@ svg.selectAll("g")
         .attr("y",function(d) { return yScale(maxY - d.y);})
         .on("mouseover", mouseover)
         .on("mouseout", mouseout)
+        .on("click", click)
         .each(fontSize)
+        .attr("cursor", "pointer")
         .attr("display", "none");
 
     });
