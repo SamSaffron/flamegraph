@@ -457,9 +457,9 @@ svg.selectAll("g")
         }
         return i.color;
       })
+      .on("click", click)
       .on("mouseover", mouseover)
       .on("mouseout", mouseout)
-      .on("click", click)
       .attr("cursor", "pointer");
 
       d3.select(this)
