@@ -3,14 +3,14 @@ require "json"
 if RUBY_VERSION >= "2.1.0".freeze
   begin
     require "stackprof"
-  rescue
+  rescue LoadError
     STDERR.puts "Please require the stackprof gem falling back to fast_stack"
     require "fast_stack"
   end
 else
   begin
     require "fast_stack"
-  rescue
+  rescue LoadError
     STDERR.puts "Please require the fast_stack gem, note flamegraph is only supported on Ruby 2.0 and above"
   end
 end
