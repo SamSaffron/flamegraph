@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["sam.saffron@gmail.com"]
   spec.description   = %q{Flamegraph support for arbitrary ruby apps}
   spec.summary       = %q{Flamegraph support for arbitrary ruby apps}
-  spec.homepage      = ""
+  spec.homepage      = "https://github.com/SamSaffron/flamegraph"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files`.split($/)
