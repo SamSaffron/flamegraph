@@ -248,6 +248,31 @@ var mouseout = function(d) {
      .attr('opacity',1);
 };
 
+// highlight the nodes of a gem
+var gemSelect = function(e) {
+	var name = e.data.name;
+	d3.selectAll(getGemNodes(name)).attr('opacity',0.5);
+	return false;
+};
+
+// remove highlighting of the nodes of a gem
+var gemDeSelect = function(e) {
+	var name = e.data.name;
+	d3.selectAll(getGemNodes(name)).attr('opacity',1);
+	return false;
+};
+
+// given the name of a gem, return all of its nodes
+var getGemNodes = function(gem_name) {
+	var frames = gemStats[gem_name].frames;
+	var nodes = [];
+	$.each(frames, function(i,f) {
+	var i = info[f];
+	nodes = nodes.concat(i.nodes);  
+	});
+	return nodes;
+};
+
 var backtrace = function(frame){
   for(var i=0; i<data.length; i++){
     if(frame === data[i]){ break; }
@@ -488,7 +513,9 @@ for (var r in info) {
 _.each(gemsSorted, function(gem){
   var node = $("<div></div>")
     .css("background-color", gem.color)
-    .text(gem.name + " " + samplePercent(gem.samples.length)) ;
+    .text(gem.name + " " + samplePercent(gem.samples.length))
+	.on("mouseover", {name: gem.name}, gemSelect)
+    .on("mouseout", {name: gem.name}, gemDeSelect);
   $('.legend').append(node);
 });
 
