@@ -300,6 +300,11 @@ $('#frameinfo-wrapper').click(function(d){
     $('#frameinfo').hide();
 });
 
+$(window).keyup(function(e) {
+  if (e.keyCode==27)
+    $('#frameinfo-wrapper,#frameinfo').hide();
+});
+
 var click = function(d){
   var trace = backtrace(d);
 
