@@ -11,12 +11,15 @@ else
   begin
     require "fast_stack"
   rescue LoadError
-    STDERR.puts "Please require the fast_stack gem, note flamegraph is only supported on Ruby 2.0 and above"
+    unless RUBY_PLATFORM == 'java'
+      STDERR.puts "Please require the fast_stack gem, note flamegraph is only supported on Ruby 2.0 and above"
+    end
   end
 end
 
 require "flamegraph/version"
 require "flamegraph/renderer"
+require "flamegraph/sampler"
 
 module Flamegraph
   def self.generate(filename=nil, opts = {})
@@ -28,8 +31,12 @@ module Flamegraph
         StackProfSampler.collect(fidelity) do
           yield
         end
-      else
+      elsif defined? FastStack
         FastStack.profile(fidelity) do # , opts[:mode] || :ruby) do
+          yield
+        end
+      else
+        Sampler.collect(fidelity) do
           yield
         end
       end
