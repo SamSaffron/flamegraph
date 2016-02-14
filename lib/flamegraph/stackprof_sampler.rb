@@ -12,7 +12,7 @@ class Flamegraph::StackProfSampler
     stacks = []
     stack = []
 
-    return [] unless result[:raw]
+    return [] unless result && result[:raw]
 
     length = nil
     result[:raw].each do |i|
