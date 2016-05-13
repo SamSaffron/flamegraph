@@ -268,7 +268,7 @@ var getGemNodes = function(gem_name) {
 	var nodes = [];
 	$.each(frames, function(i,f) {
 	var i = info[f];
-	nodes = nodes.concat(i.nodes);  
+	nodes = nodes.concat(i.nodes);
 	});
 	return nodes;
 };
@@ -314,7 +314,7 @@ var click = function(d){
 
   var linkify = function(path){
     var split = path.split("/")[0].split("-");
-    if(["activerecord","actionpack","railties","activesupport", "rails"].indexOf(split[0]) > -1) {
+    if(["actionview","activerecord","actionpack","railties","activesupport", "rails"].indexOf(split[0]) > -1) {
       var github = "https://github.com/rails/rails/blob/";
       var file = path.split(":")[0].split("/");
       if(split[0] === "rails") {
@@ -523,7 +523,6 @@ _.each(gemsSorted, function(gem){
     .on("mouseout", {name: gem.name}, gemDeSelect);
   $('.legend').append(node);
 });
-
 
 
   </script>
