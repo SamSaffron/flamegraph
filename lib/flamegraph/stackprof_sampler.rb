@@ -1,5 +1,5 @@
 class Flamegraph::StackProfSampler
-  def self.collect(fidelity=0.5)
+  def self.collect(fidelity=0.5, opt={})
 
     result = StackProf.run(mode: :wall,
                            raw: true,
@@ -23,8 +23,10 @@ class Flamegraph::StackProfSampler
 
       if length > 0
         frame = result[:frames][i]
-        frame = "#{frame[:file]}:#{frame[:line]}:in `#{frame[:name]}'"
-        stack << frame.to_s
+        if !opt[:filter] || opt[:filter] =~ frame[:file]
+          frame = "#{frame[:file]}:#{frame[:line]}:in `#{frame[:name]}'"
+          stack << frame.to_s
+        end
         length -= 1
         next
       end

@@ -387,12 +387,13 @@ var topFrames = {}
 var lastFrame = {frame: 'd52e04d-df28-41ed-a215-b6ec840a8ea5', x: -1}
 
 $.each(data, function(){
+  var by_method = location.search.match(/[?&]by_method=1\b/);
+  var group = by_method ? guessMethod(this.frame) : guessGem(this.frame);
 
-  var gem = guessGem(this.frame);
-  var stat = gemStats[gem];
+  var stat = gemStats[group];
 
   if(!stat) {
-    gemStats[gem] = stat = {name: gem, samples: [], frames: []};
+    gemStats[group] = stat = {name: group, samples: [], frames: []};
   }
 
   stat.frames.push(this.frame);
