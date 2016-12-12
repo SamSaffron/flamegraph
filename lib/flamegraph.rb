@@ -28,7 +28,11 @@ module Flamegraph
     backtraces =
       if defined? StackProf
         require "flamegraph/stackprof_sampler" unless defined? StackProfSampler
-        StackProfSampler.collect(fidelity) do
+        stack_prof_opt = {}
+        if opts[:filter_path]
+          stack_prof_opt[:filter] = /^#{Array(opts[:filter_path]).map{|p| Regexp.escape(p.to_s) }.join('|')}/
+        end
+        StackProfSampler.collect(fidelity, stack_prof_opt) do
           yield
         end
       elsif defined? FastStack
