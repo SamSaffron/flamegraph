@@ -446,37 +446,51 @@ _.each(gemsSorted, function(stat){
   currentIndex += 1;
 });
 
+function process_data(data) {
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+
+    d.scaledX = xScale(d.x-1);
+    d.scaledY = yScale(maxY - d.y);
+    d.displayW = d.scaledW = xScale(d.width);
+    d.scaledH = yScale(1);
+
+    var info_frame = info[d.frame];
+    if(!info_frame) {
+      info[d.frame] = info_frame = {nodes: [], samples: [], color: color()};
+    }
+    for(var j=0; j < d.width; j++){
+      info_frame.samples.push(d.x + j);
+    }
+    d.fill = info_frame.color;
+  }
+
+  // Samples may overlap on the same line
+  for (var r in info) {
+    if (info[r].samples) {
+      info[r].samples = info[r].samples.getUnique();
+    }
+  };
+}
+
+process_data(data);
+
 svg.selectAll("rect")
   .data(data)
   .enter()
     .append("rect")
-      .attr("x",function(d) { return xScale(d.x-1); })
-      .attr("y",function(d) { return yScale(maxY - d.y);})
-      .attr("width", function(d){return xScale(d.width);})
-      .attr("height", yScale(1))
+      .attr("x",function(d) { return d.scaledX; })
+      .attr("y",function(d) { return d.scaledY; })
+      .attr("width", function(d){ return d.displayW; })
+      .attr("height", function(d){ return d.scaledH; })
       .attr("fill", function(d){
-        var i = info[d.frame];
-        if(!i) {
-          info[d.frame] = i = {nodes: [], samples: [], color: color()};
-        }
-        i.nodes.push(this);
-        for(var j=0; j < d.width; j++){
-          i.samples.push(d.x + j);
-        }
-        return i.color;
+        info[d.frame].nodes.push(this);
+        return d.fill;
       })
       .on("click", click)
       .on("mouseover", mouseover)
       .on("mouseout", mouseout)
       .attr("cursor", "pointer");
-
-// Samples may overlap on the same line
-for (var r in info) {
-  if (info[r].samples) {
-    info[r].samples = info[r].samples.getUnique();
-  }
-};
-
 
 // render the legend
 _.each(gemsSorted, function(gem){
