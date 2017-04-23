@@ -65,6 +65,12 @@
 <body>
   <div class="graph"></div>
   <div class="info code"></div>
+  <div class="draw_options">
+    <input id="display_width" value="1" />
+    <button data-action="update">update</button>
+    <br/>
+  </div>
+    <br/>
   <div class="legend"></div>
   <div id="frameinfo-wrapper"></div>
   <div id="frameinfo">
@@ -473,36 +479,57 @@ function process_data(data) {
   };
 }
 
+function draw_data(data, options) {
+  options = options || {};
+
+  // var filtered_data = data.filter(function(d) { return d.displayW >= display_width;});
+
+  var rects = svg.selectAll("rect")
+    .data(data);
+
+  if (options.enter) {
+    rects.enter()
+      .append("rect")
+  }
+
+  rects.filter(function(d) { return d.displayW >= display_width; })
+    .attr("x",function(d) { return d.scaledX; })
+    .attr("y",function(d) { return d.scaledY; })
+    .attr("width", function(d){ return d.displayW; })
+    .attr("height", function(d){ return d.scaledH; })
+    .attr("fill", function(d){
+      info[d.frame].nodes.push(this);
+      return d.fill;
+    })
+    .on("click", click)
+    .on("mouseover", mouseover)
+    .on("mouseout", mouseout)
+    .attr("cursor", "pointer");
+
+  rects.filter(function(d) { return d.displayW < display_width; }).attr("width", 0);
+}
+
+function render_legend() {
+  // render the legend
+  _.each(gemsSorted, function(gem){
+    var node = $("<div></div>")
+      .css("background-color", gem.color)
+      .text(gem.name + " " + samplePercent(gem.samples.length))
+    .on("mouseover", {name: gem.name}, gemSelect)
+      .on("mouseout", {name: gem.name}, gemDeSelect);
+    $('.legend').append(node);
+  });
+}
+
+var display_width = parseFloat($("#display_width").val());
 process_data(data);
+draw_data(data, {enter: true});
+render_legend();
 
-svg.selectAll("rect")
-  .data(data)
-  .enter()
-    .append("rect")
-      .filter(function(d) { return d.displayW >= 1 })
-      .attr("x",function(d) { return d.scaledX; })
-      .attr("y",function(d) { return d.scaledY; })
-      .attr("width", function(d){ return d.displayW; })
-      .attr("height", function(d){ return d.scaledH; })
-      .attr("fill", function(d){
-        info[d.frame].nodes.push(this);
-        return d.fill;
-      })
-      .on("click", click)
-      .on("mouseover", mouseover)
-      .on("mouseout", mouseout)
-      .attr("cursor", "pointer");
-
-// render the legend
-_.each(gemsSorted, function(gem){
-  var node = $("<div></div>")
-    .css("background-color", gem.color)
-    .text(gem.name + " " + samplePercent(gem.samples.length))
-  .on("mouseover", {name: gem.name}, gemSelect)
-    .on("mouseout", {name: gem.name}, gemDeSelect);
-  $('.legend').append(node);
+$("button[data-action=update]").on("click", function() {
+  display_width = parseFloat($("#display_width").val());
+  draw_data(data);
 });
-
 
   </script>
 </body>
