@@ -446,14 +446,10 @@ _.each(gemsSorted, function(stat){
   currentIndex += 1;
 });
 
-
-svg.selectAll("g")
+svg.selectAll("rect")
   .data(data)
   .enter()
-    .append("g")
-    .each(function(){
-      d3.select(this)
-      .append("rect")
+    .append("rect")
       .attr("x",function(d) { return xScale(d.x-1); })
       .attr("y",function(d) { return yScale(maxY - d.y);})
       .attr("width", function(d){return xScale(d.width);})
@@ -473,9 +469,6 @@ svg.selectAll("g")
       .on("mouseover", mouseover)
       .on("mouseout", mouseout)
       .attr("cursor", "pointer");
-
-    });
-
 
 // Samples may overlap on the same line
 for (var r in info) {
