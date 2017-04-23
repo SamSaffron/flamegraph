@@ -66,9 +66,26 @@
   <div class="graph"></div>
   <div class="info code"></div>
   <div class="draw_options">
-    <input id="display_width" value="1" />
-    <button data-action="update">update</button>
-    <br/>
+    <form class="form-inline">
+      <div class="form-group">
+      <div class="form-check form-check-inline">
+        <label class="form-check-label">
+          <input class="form-check-input" type="radio" name="by_method" id="inlineRadio1" value="true"> By Method
+        </label>
+      </div>
+      <div class="form-check form-check-inline">
+        <label class="form-check-label">
+          <input class="form-check-input" type="radio" name="by_method" id="inlineRadio2" value="false"> By Gem
+        </label>
+      </div>
+      </div>
+
+      <div class="form-group">
+        <label for="display_width">Width</label>
+        <input type="text" id="display_width" class="form-control mx-sm-3" value="1" />
+      </div>
+      <button data-action="update">update</button>
+    </form>
   </div>
     <br/>
   <div class="legend"></div>
@@ -116,7 +133,6 @@ debounce = function(func, wait, trickle) {
     return timeout;
   };
 };
-
 
 var guessGem = function(frame)
 {
@@ -387,70 +403,74 @@ var rainbow = function(numOfSteps, step) {
     return (c);
 }
 
-// assign some colors, analyze samples per gem
-var gemStats = {}
-var topFrames = {}
-var lastFrame = {frame: 'd52e04d-df28-41ed-a215-b6ec840a8ea5', x: -1}
+var by_method = true;
 
-$.each(data, function(){
-  var by_method = location.search.match(/[?&]by_method=1\b/);
-  var group = by_method ? guessMethod(this.frame) : guessGem(this.frame);
+function analyze_data(data) {
+  // assign some colors, analyze samples per gem
+  gemStats = {}
+  var topFrames = {}
+  var lastFrame = {frame: 'd52e04d-df28-41ed-a215-b6ec840a8ea5', x: -1}
 
-  var stat = gemStats[group];
+  $.each(data, function(){
+    var group = by_method ? guessMethod(this.frame) : guessGem(this.frame);
 
-  if(!stat) {
-    gemStats[group] = stat = {name: group, samples: [], frames: []};
-  }
+    var stat = gemStats[group];
 
-  stat.frames.push(this.frame);
-  for(var j=0; j < this.width; j++){
-    stat.samples.push(this.x + j);
-  }
-  // This assumes the traversal is in order
-  if (lastFrame.x != this.x) {
-    var topFrame = topFrames[lastFrame.frame]
-    if (!topFrame) {
-      topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
+    if(!stat) {
+      gemStats[group] = stat = {name: group, samples: [], frames: []};
     }
-    topFrame.exclusiveCount += 1;
-    lastFrame.topFrame = topFrame;
+
+    stat.frames.push(this.frame);
+    for(var j=0; j < this.width; j++){
+      stat.samples.push(this.x + j);
+    }
+    // This assumes the traversal is in order
+    if (lastFrame.x != this.x) {
+      var topFrame = topFrames[lastFrame.frame]
+      if (!topFrame) {
+        topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
+      }
+      topFrame.exclusiveCount += 1;
+      lastFrame.topFrame = topFrame;
+    }
+    lastFrame = this;
+
+  });
+
+  var topFrame = topFrames[lastFrame.frame]
+  if (!topFrame) {
+    topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
   }
-  lastFrame = this;
+  topFrame.exclusiveCount += 1;
+  lastFrame.topFrame = topFrame;
 
-});
+  var totalGems = 0;
+  $.each(gemStats, function(k,stat){
+    totalGems++;
+    stat.samples = stat.samples.getUnique();
+  });
 
-var topFrame = topFrames[lastFrame.frame]
-if (!topFrame) {
-  topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
+
+  gemsSorted = _(gemStats).pairs()
+                            .sortBy(function(item){
+                                return -item[1].samples.length;
+                              })
+                            .map(function(item){return item[1]})
+                            .value();
+
+  var currentIndex = 0;
+  _.each(gemsSorted, function(stat){
+
+    stat.color = rainbow(totalGems, currentIndex);
+
+    for(var x=0; x < stat.frames.length; x++) {
+      info[stat.frames[x]] = {nodes: [], samples: [], color: stat.color};
+    }
+
+    currentIndex += 1;
+  });
+
 }
-topFrame.exclusiveCount += 1;
-lastFrame.topFrame = topFrame;
-
-var totalGems = 0;
-$.each(gemStats, function(k,stat){
-  totalGems++;
-  stat.samples = stat.samples.getUnique();
-});
-
-
-var gemsSorted = _(gemStats).pairs()
-                          .sortBy(function(item){
-                              return -item[1].samples.length;
-                            })
-                          .map(function(item){return item[1]})
-                          .value();
-
-var currentIndex = 0;
-_.each(gemsSorted, function(stat){
-
-  stat.color = rainbow(totalGems, currentIndex);
-
-  for(var x=0; x < stat.frames.length; x++) {
-    info[stat.frames[x]] = {nodes: [], samples: [], color: stat.color};
-  }
-
-  currentIndex += 1;
-});
 
 function process_data(data) {
   for(var i=0; i < data.length; i++) {
@@ -511,7 +531,8 @@ function draw_data(data, options) {
 
 function render_legend() {
   // render the legend
-  _.each(gemsSorted, function(gem){
+  $('.legend').html("");
+  _.each(gemsSorted.filter(function(gem) {return (gem.samples.length / maxX) * 100 > 1; }), function(gem){
     var node = $("<div></div>")
       .css("background-color", gem.color)
       .text(gem.name + " " + samplePercent(gem.samples.length))
@@ -522,13 +543,22 @@ function render_legend() {
 }
 
 var display_width = parseFloat($("#display_width").val());
+
+analyze_data(data);
 process_data(data);
 draw_data(data, {enter: true});
 render_legend();
 
 $("button[data-action=update]").on("click", function() {
   display_width = parseFloat($("#display_width").val());
+  by_method = $('input[name=by_method]:checked').val() == "true";
+
+  analyze_data(data);
+  process_data(data);
   draw_data(data);
+  render_legend();
+
+  return false;
 });
 
   </script>
