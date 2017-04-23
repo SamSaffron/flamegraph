@@ -164,7 +164,7 @@ var height = $(window).height() / 1.2;
 $('.graph').width(width).height(height);
 
 var xScale = d3.scale.linear()
-	.domain([0, maxX])
+  .domain([0, maxX])
     .range([0, width]);
 
 var yScale = d3.scale.linear()
@@ -250,27 +250,27 @@ var mouseout = function(d) {
 
 // highlight the nodes of a gem
 var gemSelect = function(e) {
-	var name = e.data.name;
-	d3.selectAll(getGemNodes(name)).attr('opacity',0.5);
-	return false;
+  var name = e.data.name;
+  d3.selectAll(getGemNodes(name)).attr('opacity',0.5);
+  return false;
 };
 
 // remove highlighting of the nodes of a gem
 var gemDeSelect = function(e) {
-	var name = e.data.name;
-	d3.selectAll(getGemNodes(name)).attr('opacity',1);
-	return false;
+  var name = e.data.name;
+  d3.selectAll(getGemNodes(name)).attr('opacity',1);
+  return false;
 };
 
 // given the name of a gem, return all of its nodes
 var getGemNodes = function(gem_name) {
-	var frames = gemStats[gem_name].frames;
-	var nodes = [];
-	$.each(frames, function(i,f) {
-	var i = info[f];
-	nodes = nodes.concat(i.nodes);
-	});
-	return nodes;
+  var frames = gemStats[gem_name].frames;
+  var nodes = [];
+  $.each(frames, function(i,f) {
+  var i = info[f];
+  nodes = nodes.concat(i.nodes);
+  });
+  return nodes;
 };
 
 var backtrace = function(frame){
@@ -467,8 +467,8 @@ function fontSize(d,i) {
 }
 
 svg.selectAll("g")
-	.data(data)
-	.enter()
+  .data(data)
+  .enter()
     .append("g")
     .each(function(){
       d3.select(this)
@@ -520,7 +520,7 @@ _.each(gemsSorted, function(gem){
   var node = $("<div></div>")
     .css("background-color", gem.color)
     .text(gem.name + " " + samplePercent(gem.samples.length))
-	.on("mouseover", {name: gem.name}, gemSelect)
+  .on("mouseover", {name: gem.name}, gemSelect)
     .on("mouseout", {name: gem.name}, gemDeSelect);
   $('.legend').append(node);
 });
