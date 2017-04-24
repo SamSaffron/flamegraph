@@ -85,7 +85,9 @@
         <input type="text" id="display_width" class="form-control mx-sm-3" value="1" />
       </div>
       <button data-action="update">update</button>
+      <button data-action="reset_zoom">reset zoom</button>
     </form>
+    <br/>
   </div>
     <br/>
   <div class="legend"></div>
@@ -100,40 +102,6 @@
 var data = /**DATA**/;
 var maxX = 0;
 var maxY = 0;
-
-debounce = function(func, wait, trickle) {
-  var timeout;
-
-  timeout = null;
-  return function() {
-    var args, context, currentWait, later;
-    context = this;
-    args = arguments;
-    later = function() {
-      timeout = null;
-      return func.apply(context, args);
-    };
-
-    if (timeout && trickle) {
-      // already queued, let it through
-      return;
-    }
-
-    if (typeof wait === "function") {
-      currentWait = wait();
-    } else {
-      currentWait = wait;
-    }
-
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-
-    timeout = setTimeout(later, currentWait);
-    return timeout;
-  };
-};
-
 var guessGem = function(frame)
 {
   var split = frame.split('/gems/');
@@ -177,8 +145,14 @@ var guessFile = function(frame) {
 $.each(data, function(){
    maxX = Math.max(maxX, this.x + this.width);
    maxY = Math.max(maxY, this.y);
-   this.shortName = guessMethod(this.frame);
+   this.methodName = guessMethod(this.frame);
+   this.gemName = guessGem(this.frame);
+   this.fileName = guessFile(this.frame);
+   this.opacityFactor = 1;
 });
+
+oMaxX = maxX;
+oMaxY = maxY;
 
 var width = $(window).width();
 var height = $(window).height() / 1.2;
@@ -193,40 +167,13 @@ var yScale = d3.scale.linear()
     .domain([0, maxY])
     .range([0,height]);
 
-var realHeight = 0;
-var debouncedHeightCheck = debounce(function(){
-  if (realHeight > 15) {
-    svg.selectAll('text').attr('display','show');
-  } else {
-    svg.selectAll('text').attr('display','none');
-  }
-}, 200);
-
-function zoom()
-{
-  svg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")");
-
-  realHeight = yScale(1) * d3.event.scale;
-  debouncedHeightCheck();
-}
-
 var svg = d3.select(".graph")
                     .append("svg")
                     .attr("width", "100%")
                     .attr("height", "100%")
                     .attr("pointer-events", "all")
                     .append('svg:g')
-                    .call(d3.behavior.zoom().on("zoom", zoom))
                     .append('svg:g');
-
-
-// so zoom works everywhere
-svg.append("rect")
-    .attr("x",function(d) { return xScale(0); })
-    .attr("y",function(d) { return yScale(0);})
-    .attr("width", function(d){return xScale(maxX);})
-    .attr("height", yScale(maxY))
-    .attr("fill", "white");
 
 var color = function() {
   var r = parseInt(205 + Math.random() * 50);
@@ -236,29 +183,21 @@ var color = function() {
 }
 var info = {};
 
-// http://stackoverflow.com/questions/1960473/unique-values-in-an-array
-Array.prototype.getUnique = function() {
-    var o = {}, a = []
-    for (var i = 0; i < this.length; i++) o[this[i]] = 1
-    for (var e in o) a.push(e)
-    return a
-}
-
 var samplePercent = function(samples, exclusive){
   var info = " (" + samples +
     " sample" + (samples == 1 ? "" : "s") + " - " +
-    ((samples / maxX) * 100).toFixed(2) + "%) ";
+    ((samples / oMaxX) * 100).toFixed(2) + "%) ";
   if (exclusive) {
     info += " (" + exclusive +
       " exclusive - " +
-    ((exclusive / maxX) * 100).toFixed(2) + "%) ";
+    ((exclusive / oMaxX) * 100).toFixed(2) + "%) ";
   }
   return info;
 }
 
 var mouseover =  function(d) {
   var i = info[d.frame];
-  $('.info').text( d.frame + " " + samplePercent(i.samples.length, d.topFrame ? d.topFrame.exclusiveCount : 0));
+  $('.info').text( d.frame + " " + samplePercent(i.samples.size, d.topFrame ? d.topFrame.exclusiveCount : 0));
   d3.selectAll(i.nodes)
      .attr('opacity',0.5);
 };
@@ -267,7 +206,7 @@ var mouseout = function(d) {
   var i = info[d.frame];
   $('.info').text("");
   d3.selectAll(i.nodes)
-     .attr('opacity',1);
+    .attr('opacity', function(f) { return f.opacityFactor });
 };
 
 // highlight the nodes of a gem
@@ -280,7 +219,7 @@ var gemSelect = function(e) {
 // remove highlighting of the nodes of a gem
 var gemDeSelect = function(e) {
   var name = e.data.name;
-  d3.selectAll(getGemNodes(name)).attr('opacity',1);
+  d3.selectAll(getGemNodes(name)).attr('opacity', function(d) { return d.opacityFactor });
   return false;
 };
 
@@ -327,7 +266,86 @@ $(window).keyup(function(e) {
     $('#frameinfo-wrapper,#frameinfo').hide();
 });
 
-var click = function(d){
+var reset_element = function(e) {
+  if (!e.filtered_out) {
+    e.y = e.filteredY || e.oY;
+    e.x = e.oX;
+    e.width = e.oWidth;
+    e.opacityFactor = 1;
+  }
+}
+
+var reset_data = function() {
+  for(var i = 0; i < data.length; i++) {
+    var d = data[i];
+
+    reset_element(d);
+  }
+}
+
+var reset_zoom = function() {
+  reset_data();
+  process_data(data);
+  draw_data(data);
+}
+
+var zoom = function(d) {
+
+  // reset_data();
+  for(var i = 0; i < data.length; i++) {
+    var f = data[i];
+
+    if (f.filtered_out) {
+      continue;
+    }
+
+    var visible_parent = function(d) {
+      var current_parent = d.parent;
+      while(current_parent && current_parent.y <= 0) {
+        current_parent = current_parent.parent;
+      }
+
+      return current_parent;
+    }
+
+    vp = visible_parent(d);
+
+    reset_element(f);
+    if (f === d) {
+      f.opacityFactor = 1;
+    } else if (
+        f.oY > d.oY &&
+        f.oX >= d.oX && f.oX + f.oWidth <= d.oX + d.oWidth
+        ){
+    } else if (f === vp) {
+      f.width = d.oWidth;
+      f.x = d.oX;
+      f.opacityFactor = 0.5;
+    } else if (
+        f.oY < d.oY &&
+        f.oX <= d.oX
+        ){
+      f.width = 0;
+      f.x = 1;
+      f.y = 1;
+    } else {
+      f.width = 0;
+      f.x = 1;
+      f.y = 1;
+    }
+
+    f.x = f.x - d.oX + 1;
+  }
+
+
+  process_data(data);
+  draw_data(data);
+
+  return false;
+}
+
+var backtrace_data = function(d){
+  console.log(d);
   var trace = backtrace(d);
 
   var link = function(path, dest){
@@ -367,11 +385,18 @@ var click = function(d){
   var table = trace.map(function(f){
         var i = info[f.frame];
         return "<tr><td class='code'>" + simplify(f.frame) + "</td><td class='sample-info'>" +
-                samplePercent(i.samples.length, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
+                samplePercent(i.samples.size, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
                 "</td></tr>";
       }).join("\n");
 
   var table = $('#frameinfo table').html(table);
+  var children = d.children.map(function(f){
+        var i = info[f.frame];
+        return "<tr><td class='code'>" + simplify(f.frame) + "</td><td class='sample-info'>" +
+                samplePercent(i.samples.size, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
+                "</td></tr>";
+      }).join("\n");
+  table.append('<tr><td colspan="2"><h3>Calls</h3></td></tr>').append(children);
   table.find(".full-location").hide().after("<span class='expand'>&hellip; </span>");
   table.find(".expand").css({cursor: "pointer"}).click(function(){
       $(this).hide().parent().find(".full-location").show();
@@ -417,12 +442,12 @@ function analyze_data(data) {
     var stat = gemStats[group];
 
     if(!stat) {
-      gemStats[group] = stat = {name: group, samples: [], frames: []};
+      gemStats[group] = stat = {name: group, samples: new Set(), frames: []};
     }
 
     stat.frames.push(this.frame);
     for(var j=0; j < this.width; j++){
-      stat.samples.push(this.x + j);
+      stat.samples.add(this.x + j);
     }
     // This assumes the traversal is in order
     if (lastFrame.x != this.x) {
@@ -447,13 +472,12 @@ function analyze_data(data) {
   var totalGems = 0;
   $.each(gemStats, function(k,stat){
     totalGems++;
-    stat.samples = stat.samples.getUnique();
   });
 
 
   gemsSorted = _(gemStats).pairs()
                             .sortBy(function(item){
-                                return -item[1].samples.length;
+                                return -item[1].samples.size;
                               })
                             .map(function(item){return item[1]})
                             .value();
@@ -464,7 +488,8 @@ function analyze_data(data) {
     stat.color = rainbow(totalGems, currentIndex);
 
     for(var x=0; x < stat.frames.length; x++) {
-      info[stat.frames[x]] = {nodes: [], samples: [], color: stat.color};
+      info[stat.frames[x]] = info[stat.frames[x]] || {nodes: [], samples: new Set(), color: stat.color};
+      info[stat.frames[x]].color = stat.color;
     }
 
     currentIndex += 1;
@@ -472,7 +497,94 @@ function analyze_data(data) {
 
 }
 
+var set_relations = function(data) {
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+    var x = i;
+    var depth = d.y;
+
+    d.parent = null;
+
+    while(x > 0){
+
+      if(data[x].y === depth - 1) {
+        d.parent = data[x];
+        data[x].children = data[x].children || [];
+        if ($.inArray(d, data[x].children) == -1) {
+          data[x].children.push(d);
+        }
+        break;
+        depth--;
+      }
+
+      x--;
+    }
+  }
+}
+
+function store_originals(data) {
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+    d.oWidth = d.oWidth || d.width;
+    d.oX = d.oX || d.x;
+    d.oY = d.oY || d.y;
+  }
+}
+
+
+function setMaxX(data) {
+  maxX = -1;
+
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+    maxX = Math.max(maxX, d.x + d.width);
+  }
+
+  xScale = d3.scale.linear()
+    .domain([0, maxX])
+    .range([0, width]);
+
+  return maxX;
+}
+
+function setMaxY(data) {
+  maxY = -1;
+  minY = Infinity;
+
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+    if (xScale(d.width) > display_width)  {
+      maxY = Math.max(maxY, d.y);
+      minY = Math.min(minY, d.y);
+    }
+  }
+
+  yScale = d3.scale.linear()
+    .domain([0, maxY - minY + 1])
+    .range([0,height]);
+
+  return maxY;
+}
+
+function process_frame_info(data) {
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+
+    var info_frame = info[d.frame];
+    if(!info_frame) {
+      info[d.frame] = info_frame = {nodes: [], samples: new Set(), color: color()};
+    }
+    for(var j=0; j < d.width; j++){
+      info_frame.samples.add(d.x + j);
+    }
+  }
+}
+
 function process_data(data) {
+
+  setMaxX(data);
+  setMaxY(data);
+
   for(var i=0; i < data.length; i++) {
     var d = data[i];
 
@@ -482,27 +594,63 @@ function process_data(data) {
     d.scaledH = yScale(1);
 
     var info_frame = info[d.frame];
-    if(!info_frame) {
-      info[d.frame] = info_frame = {nodes: [], samples: [], color: color()};
-    }
-    for(var j=0; j < d.width; j++){
-      info_frame.samples.push(d.x + j);
-    }
     d.fill = info_frame.color;
+
+  }
+}
+
+function filter_data_by_frame(matches) {
+
+  var frames = [];
+  for(var i=0; i < data.length; i++) {
+    var d = data[i];
+
+    if (matches.some(function(v) { return d.frame.indexOf(v) >= 0; })) {
+      frames.push(d);
+    } else {
+      d.filtered_out = true;
+      d.width = 0;
+      d.x = 0;
+      d.y = 0;
+    }
   }
 
-  // Samples may overlap on the same line
-  for (var r in info) {
-    if (info[r].samples) {
-      info[r].samples = info[r].samples.getUnique();
+  var fix_drop = function(d, by) {
+    for(var i=0; i < data.length; i++) {
+      var f = data[i];
+      if (
+        f.oY > d.oY &&
+        f.oX >= d.oX && f.oX + f.oWidth <= d.oX + d.oWidth
+        ){
+        f.y = f.y - by;
+        f.filteredY = f.y;
+      }
     }
   };
+
+  for(var i= frames.length - 1; i > 0; i--) {
+    var f = frames[i];
+    var current_parent = f.parent;
+
+    drop = 0;
+    while (current_parent && current_parent.y <= 0) {
+      drop = drop + 1;
+      current_parent = current_parent.parent;
+    }
+
+    f.y = f.y - drop;
+    f.filteredY = f.y;
+    if (drop > 0) {
+      fix_drop(f, drop)
+    }
+  }
+
 }
 
 function draw_data(data, options) {
   options = options || {};
 
-  // var filtered_data = data.filter(function(d) { return d.displayW >= display_width;});
+  // var filtered_data = data.filter(function(d) { return d.displayW > display_width;});
 
   var rects = svg.selectAll("rect")
     .data(data);
@@ -510,32 +658,41 @@ function draw_data(data, options) {
   if (options.enter) {
     rects.enter()
       .append("rect")
+      .each(function(d) { 
+        d.node = this;
+        info[d.frame].nodes.push(this);
+      })
+      .on("contextmenu", backtrace_data)
+      .on("click", zoom)
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout);
   }
 
-  rects.filter(function(d) { return d.displayW >= display_width; })
+  rects
+    .filter(function(d) { return d.displayW > display_width; })
+    .transition()
     .attr("x",function(d) { return d.scaledX; })
     .attr("y",function(d) { return d.scaledY; })
     .attr("width", function(d){ return d.displayW; })
     .attr("height", function(d){ return d.scaledH; })
     .attr("fill", function(d){
-      info[d.frame].nodes.push(this);
       return d.fill;
     })
-    .on("click", click)
-    .on("mouseover", mouseover)
-    .on("mouseout", mouseout)
+    .attr("opacity", function(d){ return d.opacityFactor; })
     .attr("cursor", "pointer");
 
-  rects.filter(function(d) { return d.displayW < display_width; }).attr("width", 0);
+  rects
+    .filter(function(d) { return d.displayW < display_width; })
+    .attr("width", 0);
 }
 
 function render_legend() {
   // render the legend
   $('.legend').html("");
-  _.each(gemsSorted.filter(function(gem) {return (gem.samples.length / maxX) * 100 > 1; }), function(gem){
+  _.each(gemsSorted.filter(function(gem) {return (gem.samples.size / oMaxX) * 100 > 1; }), function(gem){
     var node = $("<div></div>")
       .css("background-color", gem.color)
-      .text(gem.name + " " + samplePercent(gem.samples.length))
+      .text(gem.name + " " + samplePercent(gem.samples.size))
     .on("mouseover", {name: gem.name}, gemSelect)
       .on("mouseout", {name: gem.name}, gemDeSelect);
     $('.legend').append(node);
@@ -544,11 +701,18 @@ function render_legend() {
 
 var display_width = parseFloat($("#display_width").val());
 
+store_originals(data);
+set_relations(data);
+process_frame_info(data);
+
 analyze_data(data);
 process_data(data);
 draw_data(data, {enter: true});
-render_legend();
 
+$("button[data-action=reset_zoom]").on("click", function() {
+  reset_zoom();
+  return false;
+});
 $("button[data-action=update]").on("click", function() {
   display_width = parseFloat($("#display_width").val());
   by_method = $('input[name=by_method]:checked').val() == "true";
@@ -556,11 +720,10 @@ $("button[data-action=update]").on("click", function() {
   analyze_data(data);
   process_data(data);
   draw_data(data);
-  render_legend();
+  // render_legend();
 
   return false;
 });
-
   </script>
 </body>
 </html>
