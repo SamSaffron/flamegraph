@@ -2,6 +2,11 @@
 <html>
 <head>
 /**INCLUDES**/
+<script
+  src="https://code.jquery.com/color/jquery.color-2.1.2.min.js"
+  integrity="sha256-H28SdxWrZ387Ldn0qogCzFiUDDxfPiNIyJX7BECQkDE="
+  crossorigin="anonymous"></script>
+
 
 <meta charset=utf-8 />
 
@@ -83,6 +88,10 @@
       <div class="form-group">
         <label for="display_width">Width</label>
         <input type="text" id="display_width" class="form-control mx-sm-3" value="1" />
+      </div>
+      <div class="form-group">
+        <label for="filter_string">Filters</label>
+        <input type="text" id="filter_string" class="form-control mx-sm-3" value="app/" />
       </div>
       <button data-action="update">update</button>
       <button data-action="reset_zoom">reset zoom</button>
@@ -284,12 +293,14 @@ var reset_data = function() {
 }
 
 var reset_zoom = function() {
+  current_zoom = null;
   reset_data();
   process_data(data);
   draw_data(data);
 }
 
 var zoom = function(d) {
+  current_zoom = d;
 
   // reset_data();
   for(var i = 0; i < data.length; i++) {
@@ -427,6 +438,18 @@ var rainbow = function(numOfSteps, step) {
     var c = "#" + ("00" + (~ ~(r * 255)).toString(16)).slice(-2) + ("00" + (~ ~(g * 255)).toString(16)).slice(-2) + ("00" + (~ ~(b * 255)).toString(16)).slice(-2);
     return (c);
 }
+
+rainbow = function (total, step) {
+  // 30 random hues with step of 12 degrees
+  var hue = Math.floor(Math.random() * total) * 12;
+
+  return $.Color({
+    hue: hue,
+    saturation: 0.9,
+    lightness: 0.5,
+    alpha: 1
+  }).toHexString();
+};
 
 var by_method = true;
 
@@ -599,7 +622,18 @@ function process_data(data) {
   }
 }
 
+function reset_filter() {
+  for(var i = 0; i < data.length; i++) {
+    var d = data[i];
+    d.filtered_out = null;
+    d.filteredY = null;
+  }
+};
+
 function filter_data_by_frame(matches) {
+  if (matches.length == 0) {
+    return;
+  }
 
   var frames = [];
   for(var i=0; i < data.length; i++) {
@@ -700,10 +734,13 @@ function render_legend() {
 }
 
 var display_width = parseFloat($("#display_width").val());
+var filters = $("#filter_string").val().split(",");
+var current_zoom = null;
 
 store_originals(data);
 set_relations(data);
 process_frame_info(data);
+filter_data_by_frame(filters);
 
 analyze_data(data);
 process_data(data);
@@ -713,13 +750,22 @@ $("button[data-action=reset_zoom]").on("click", function() {
   reset_zoom();
   return false;
 });
+
 $("button[data-action=update]").on("click", function() {
   display_width = parseFloat($("#display_width").val());
+  filters = $("#filter_string").val().split(",");
   by_method = $('input[name=by_method]:checked').val() == "true";
 
+  reset_filter();
+  reset_data();
+  filter_data_by_frame(filters);
   analyze_data(data);
-  process_data(data);
-  draw_data(data);
+  if (current_zoom) {
+    zoom(current_zoom);
+  } else {
+    process_data(data);
+    draw_data(data);
+  }
   // render_legend();
 
   return false;
