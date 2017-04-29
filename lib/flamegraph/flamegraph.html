@@ -19,47 +19,6 @@
   .code {
     font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
   }
-  #frameinfo table .sample-info {
-    width: 200px;
-    color: #333;
-    font-size: 12px;
-  }
-  #frameinfo table {
-    border-collapse: collapse;
-  }
-  #frameinfo table tr {
-    border-bottom: 1px solid #eee;
-    margin-top: 5px;
-  }
-  #frameinfo td {
-    padding: 5px;
-  }
-  #frameinfo-wrapper {
-    position: fixed;
-    z-index: 1;
-    opacity: 0.7;
-    background-color: black;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    display: none;
-  }
-  #frameinfo {
-    position: fixed;
-    padding: 10px;
-    z-index: 2;
-    opacity: 1.0;
-    top: 0;
-    margin-top: 50px;
-    margin-left: 40px;
-    width: 80%;
-    height: 80%;
-    background-color: white;
-    border: 2px solid #666;
-    display: none;
-    overflow: auto;
-  }
 
   .content {
     width: 100%;
@@ -68,37 +27,39 @@
 </head>
 <body>
   <script id="info-table-template" type="text/x-handlebars-template">
-    <table class="ui compact small single line table">
+    <table class="ui compact small table" style="word-break: break-all;">
       <thead>
-      <!-- <tr> -->
-      <!--   <th> Method </td> -->
-      <!--   <th> Gem </td> -->
-      <!--   <th> Current Samples </td> -->
-      <!--   <th> of Parent </td> -->
-      <!--   <th> of Zoom </td> -->
-      <!--   <th> of Total </td> -->
+      <tr>
+        <th> ID </td>
+        <th> Method </td>
+        <th> Gem </td>
+        <th> Current Samples </td>
+        <th> of Parent </td>
+        <th> of Zoom </td>
+        <th> of Total </td>
 
-      <!--   <th> # Calls </td> -->
-      <!--   <th> All Samples </td> -->
-      <!--   <th> of Total </td> -->
-      <!-- </tr> -->
+        <th> # Calls </td>
+        <th> All Samples </td>
+        <th> of Total </td>
+      </tr>
       </thead>
       <tbody>
       {{#each stats}}
         <tr>
-          <td class="six wide"> [{{id}}] {{shortName}} </td>
-          <td class="three wide"> {{gemName}} </td>
-          <td class="one wide"> {{samples}} </td>
-          <td class="one wide"> {{ofParent}}% </td>
-          <td class="one wide"> {{ofZoom}}% </td>
-          <td class="one wide"> {{ofTotal}}% </td>
+          <td class="one wide"> {{id}} </td>
+          <td class="four wide"> <b>{{shortName}}</b> </td>
+          <td class="two wide"> {{gemName}} </td>
+          <td class=""> {{samples}} </td>
+          <td class=""> {{ofParent}}% </td>
+          <td class=""> {{ofZoom}}% </td>
+          <td class=""> {{ofTotal}}% </td>
 
-          <td class="one wide"> {{calls}} </td>
-          <td class="one wide"> {{totalSamples}} </td>
-          <td class="one wide"> {{allOfTotal}}% </td>
+          <td class=""> {{calls}} </td>
+          <td class=""> {{totalSamples}} </td>
+          <td class=""> {{allOfTotal}}% </td>
         </tr>
         <tr>
-          <td colspan="9"> {{frame}} </td>
+          <td colspan="10"> {{frame}} </td>
         </tr>
       {{/each}}
       </tbody>
@@ -106,14 +67,23 @@
   </script>
 
   <div id="main" class="ui fluid container" style="padding: 5px;">
-    <div class="info code"></div>
     <div class="graph"></div>
+    <div class="info code" style="width: 100%; position: fixed; z-index: 100000;"></div>
 
-    <div id="frameinfo-wrapper"></div>
-    <div id="frameinfo">
-      <h3>Frame Info</h3>
-      <table>
-      </table>
+    <div id="info-modal" class="ui modal" style="height: 95%; width: 95%;">
+      <i class="close icon"></i>
+      <div class="header">
+      </div>
+      <div class="content">
+        <div class="ui top attached tabular menu">
+          <a class="active item" data-tab="first">Backtrace</a>
+          <a class="item" data-tab="second">Direct Calls</a>
+        </div>
+        <div class="backtrace ui bottom attached active tab segment" data-tab="first">
+        </div>
+        <div class="direct-calls ui bottom attached tab segment" data-tab="second">
+        </div>
+      </div>
     </div>
 
     <div id="legend" class="ui three column grid" style="margin-top: 5px; ">
@@ -317,9 +287,8 @@ oMaxX = maxX;
 oMaxY = maxY;
 
 var width = $("#main").width();
-var height = ($(window).height() / 1.2) - 65;
+var height = ($(window).height() / 1.2);
 
-$('.info.code').height(66);
 $('.graph').width(width).height(height);
 
 var xScale = d3.scale.linear()
@@ -367,10 +336,10 @@ var template = function(name) {
   return templates[name];
 };
 
-var mouseover =  function(d) {
+var frameStats = function(d) {
   var i = info[byType][d.frame];
 
-  visible = visibleParent(d);
+  visible = filteredParent(d);
 
   var stat = {
     id: d.id,
@@ -394,6 +363,13 @@ var mouseover =  function(d) {
   if (currentZoom) {
     stat["ofZoom"] = ((d.samples.size / currentZoom.samples.size) * 100).toFixed(2);
   }
+
+  return stat;
+}
+
+var mouseover =  function(d) {
+
+  var stat = frameStats(d);
 
   $('.info').html(template("info-table-template")({stats: [stat]}));
   // $('.info').text( d.frame + " " + samplePercent(i.samples.size, d.topFrame ? d.topFrame.exclusiveCount : 0));
@@ -427,10 +403,6 @@ var deselectElement = function(e) {
 };
 
 var backtrace = function(frame){
-  for(var i=0; i<data.length; i++){
-    if(frame === data[i]){ break; }
-  }
-
   frames = [frame];
 
   var parent = visibleParent(frame)
@@ -458,7 +430,7 @@ $(window).keyup(function(e) {
     }
   } else if (e.keyCode == 189) {
     if (currentZoom) {
-      var visible = visibleParent(currentZoom);
+      var visible = filteredParent(currentZoom);
       if (visible) {
         zoom(visible);
       }
@@ -535,62 +507,19 @@ var zoom = function(d, options) {
 var showBacktrace = function(d){
   var trace = backtrace(d);
 
-  var link = function(path, dest){
-    return path.replace(/[^\/]+:\d+/, function(x){ return "<a target='_blank' href='"+ dest +"'>" + x + "</a>"})
-  };
+  $modal = $("#info-modal");
 
-  var linkify = function(path){
-    var split = path.split("/")[0].split("-");
-    if(["actionview","activerecord","actionpack","railties","activesupport", "rails"].indexOf(split[0]) > -1) {
-      var github = "https://github.com/rails/rails/blob/";
-      var file = path.split(":")[0].split("/");
-      if(split[0] === "rails") {
-        file.shift();
-      } else {
-        file[0] = split[0];
-      }
+  $modal.find(".header").text("Backtrace Info");
+  var stats = trace.map(frameStats)
+  $modal.find('.backtrace').html(template("info-table-template")({stats: stats}));
 
-      github += (split[1].length < 6 ? "v" : "") + split[1] + "/";
-      github += file.join("/");
-      github += "#L" + parseInt(path.split(":")[1]);
 
-      return link(path, github);
-    }
-    return path;
-  }
+  stats = directFilteredChildren(d).map(frameStats);
+  $modal.find('.direct-calls').html(template("info-table-template")({stats: stats}));
 
-  var simplify = function(frame){
-    var split = frame.split('/gems/');
-    if(split.length > 1){
-      var path = linkify(split.pop());
-      return "<span class='full-location'>" + split.join('/gems/') + "/</span>" + path;
-    } else {
-      return frame;
-    }
-  }
+  $modal.modal('show');
 
-  var table = trace.map(function(f){
-        var i = info[byType][f.frame];
-        return "<tr><td class='code'> [id:" + f.id + "]" + simplify(f.frame) + "</td><td class='sample-info'>" +
-                samplePercent(i.samples.size, f.oWidth) + 
-                "</td></tr>";
-      }).join("\n");
-
-  var table = $('#frameinfo table').html(table);
-  var children = directVisibleChildren(d).map(function(f){
-        var i = info[byType][f.frame];
-        return "<tr><td class='code'>" + simplify(f.frame) + "</td><td class='sample-info'>" +
-                samplePercent(i.samples.size, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
-                "</td></tr>";
-      }).join("\n");
-  table.append('<tr><td colspan="2"><h3>Calls</h3></td></tr>').append(children);
-  table.find(".full-location").hide().after("<span class='expand'>&hellip; </span>");
-  table.find(".expand").css({cursor: "pointer"}).click(function(){
-      $(this).hide().parent().find(".full-location").show();
-  });
-
-  $('#frameinfo-wrapper').show();
-  $('#frameinfo').show();
+  return false;
 };
 
 // http://stackoverflow.com/a/7419630
@@ -683,16 +612,20 @@ function analyzeData(data, type) {
 
 }
 
-var directVisibleChildren = function(d) {
-  return visibleChildren(d).filter(function(c) { return c.y == d.y + 1 });
+var directFilteredChildren = function(d) {
+  return filteredChildren(d).filter(function(c) { return c.y == d.y + 1 });
 };
 
-var visibleChildren = function(d) {
+var filteredChildren = function(d) {
   return d.allChildren.filter(filteredDataFilter);
 };
 
-var visibleParent = function(d) {
+var filteredParent = function(d) {
   return d.allParents.filter(filteredDataFilter)[0];
+};
+
+var visibleParent = function(d) {
+  return d.allParents.filter(filteredDataFilter).filter(zoomedDataFilter)[0];
 };
 
 var setRelations = function(data) {
@@ -904,7 +837,7 @@ function filterDataByFrame(includedFilters, excludedFilters) {
 
       if (shouldInclude && !shouldExclude) {
         d.filteredIn = true;
-        var parent = visibleParent(d);
+        var parent = filteredParent(d);
         if (parent) {
           d.y = parent.y + 1;
         }
@@ -1007,7 +940,7 @@ function renderLegend(type) {
     $.each(this.data || [], function() {
       var d = this;
       sampleSize = sampleSize + this.samples.size;
-      $.each(directVisibleChildren(this), function() {
+      $.each(directFilteredChildren(this), function() {
         childrenSize = childrenSize + this.samples.size;
       });
     });
@@ -1146,6 +1079,8 @@ $("button[data-action=filter]").on("click", function() {
 
   return false;
 });
+
+$("#info-modal a.item").tab();
 
 
 </script>
