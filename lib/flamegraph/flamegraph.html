@@ -67,7 +67,7 @@
   </script>
 
   <div id="main" class="ui fluid container" style="padding: 5px;">
-    <div class="graph"></div>
+    <div class="graph" oncontextmenu="return false;"></div>
     <div class="info code" style="width: 100%; position: fixed; z-index: 100000;"></div>
 
     <div id="info-modal" class="ui modal" style="height: 95%; width: 95%;">
@@ -371,7 +371,7 @@ var mouseover =  function(d) {
 
   var stat = frameStats(d);
 
-  $('.info').html(template("info-table-template")({stats: [stat]}));
+  $('.info').html(template("info-table-template")({stats: [stat]})).show();
   // $('.info').text( d.frame + " " + samplePercent(i.samples.size, d.topFrame ? d.topFrame.exclusiveCount : 0));
   d3.selectAll("rect[method='" + d.methodName + "']")
     .attr('fill', function(d) { return "black"; })
@@ -380,7 +380,7 @@ var mouseover =  function(d) {
 
 var mouseout = function(d) {
   var i = info[byType][d.frame];
-  $('.info').children().remove();
+  $('.info').hide().children().remove();
   d3.selectAll("rect[method='" + d.methodName + "']")
     .attr('fill', function(d) { return d.fill; })
     .attr('opacity', function(f) { return f.opacityFactor });
