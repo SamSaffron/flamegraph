@@ -2,70 +2,79 @@
 require 'base64'
 
 class Flamegraph::Renderer
-  def initialize(stacks)
+  def initialize(stacks, opts = {})
     @stacks = stacks
+    @opts = opts
   end
 
   def graph_html(embed_resources)
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        embed("jquery.min.js","d3.min.js","lodash.min.js")
+        embed("semantic.min.css", "jquery.min.js","d3.min.js","lodash.min.js", "semantic.min.js", "handlebars.min.js")
       else
-        '<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+        '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/1.3.1/lodash.min.js"></script>'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/1.3.1/lodash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>'
       end
 
     body.sub!("/**DATA**/", ::JSON.generate(graph_data));
+    body.sub!("/**JS_INCLUDE_FILTERS**/", ::JSON.generate(@opts[:js_include_filters] || []));
+    body.sub!("/**JS_EXCLUDE_FILTERS**/", ::JSON.generate(@opts[:js_exclude_filters] || []));
     body
   end
 
   def graph_data
-    table = []
-    prev = []
+    @graph_data ||=
+      begin
+        table = []
+        prev = []
 
-    # a 2d array makes collapsing easy
-    @stacks.each_with_index do |stack, pos|
+        # a 2d array makes collapsing easy
+        @stacks.each_with_index do |stack, pos|
 
-      next unless stack
+          next unless stack
 
-      col = []
+          col = []
 
-      stack.reverse.map{|r| r.to_s}.each_with_index do |frame, i|
+          stack.reverse.map{|r| r.to_s}.each_with_index do |frame, i|
 
-        if !prev[i].nil?
-          last_col = prev[i]
-          if last_col[0] == frame
-            last_col[1] += 1
-            col << nil
-            next
+            if !prev[i].nil?
+              last_col = prev[i]
+              if last_col[0] == frame
+                last_col[1] += 1
+                col << nil
+                next
+              end
+            end
+
+            prev[i] = [frame, 1]
+            col << prev[i]
+          end
+          prev = prev[0..col.length-1].to_a
+          table << col
+        end
+
+        data = []
+
+        # a 1d array makes rendering easy
+        table.each_with_index do |col, col_num|
+          col.each_with_index do |row, row_num|
+            next unless row && row.length == 2
+            data << {
+              :x => col_num + 1,
+              :y => row_num + 1,
+              :width => row[1],
+              :frame => row[0]
+            }
           end
         end
 
-        prev[i] = [frame, 1]
-        col << prev[i]
+        data
       end
-      prev = prev[0..col.length-1].to_a
-      table << col
-    end
-
-    data = []
-
-    # a 1d array makes rendering easy
-    table.each_with_index do |col, col_num|
-      col.each_with_index do |row, row_num|
-        next unless row && row.length == 2
-        data << {
-          :x => col_num + 1,
-          :y => row_num + 1,
-          :width => row[1],
-          :frame => row[0]
-        }
-      end
-    end
-
-    data
   end
 
   private
@@ -74,7 +83,11 @@ class Flamegraph::Renderer
     out = ""
     files.each do |file|
       body = read(file)
-      out << "<script src='data:text/javascript;base64," << Base64.encode64(body) << "'></script>"
+      if file =~ /\.js$/
+        out << "<script src='data:text/javascript;base64," << Base64.encode64(body) << "'></script>"
+      elsif file =~ /\.css$/
+        out << "<link rel='stylesheet' href='data:css/javascript;base64," << Base64.encode64(body) << "' />"
+      end
     end
     out
   end
