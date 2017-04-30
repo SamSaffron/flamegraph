@@ -46,7 +46,7 @@
       <tbody>
       {{#each stats}}
         <tr>
-          <td class="one wide"> {{id}} </td>
+          <td class="one wide"> <i data-id="{{id}}" class="search icon"></i> {{id}} </td>
           <td class="four wide"> <b>{{shortName}}</b> </td>
           <td class="two wide"> {{gemName}} </td>
           <td class=""> {{samples}} </td>
@@ -526,6 +526,13 @@ var showBacktrace = function(d){
 
   stats = directFilteredChildren(d).map(frameStats);
   $modal.find('.direct-calls').html(template("info-table-template")({stats: stats}));
+
+  $modal.find(".search.icon").on("click", function() {
+    var id = parseInt($(this).data("id"), 10);
+    zoom(data[id]);
+    $modal.modal('hide');
+    return false;
+  });
 
   $modal.modal('show');
 
