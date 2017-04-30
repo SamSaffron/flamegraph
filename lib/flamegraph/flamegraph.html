@@ -33,7 +33,8 @@
         <th> ID </td>
         <th> Method </td>
         <th> Gem </td>
-        <th> Current Samples </td>
+        <th> Self </td>
+        <th> Samples </td>
         <th> of Parent </td>
         <th> of Zoom </td>
         <th> of Total </td>
@@ -49,6 +50,7 @@
           <td class="one wide"> <i data-id="{{id}}" class="search icon"></i> {{id}} </td>
           <td class="four wide"> <b>{{shortName}}</b> </td>
           <td class="two wide"> {{gemName}} </td>
+          <td class=""> {{selfSamples}} </td>
           <td class=""> {{samples}} </td>
           <td class=""> {{ofParent}}% </td>
           <td class=""> {{ofZoom}}% </td>
@@ -71,6 +73,14 @@
     <div class="info code" style="width: 100%; position: fixed; z-index: 100000;"></div>
 
     <div id="info-modal" class="ui modal" style="height: 95%; width: 95%;">
+      <i class="close icon"></i>
+      <div class="header">
+      </div>
+      <div class="content">
+      </div>
+    </div>
+
+    <div id="backtrace-modal" class="ui modal" style="height: 95%; width: 95%;">
       <i class="close icon"></i>
       <div class="header">
       </div>
@@ -351,6 +361,11 @@ var frameStats = function(d) {
   visible = filteredParent(d);
   inSet = dataStats["method"][d.methodName];
 
+  var childrenSize = 0;
+  $.each(directFilteredChildren(d), function() {
+    childrenSize = childrenSize + this.samples.size;
+  });
+
   var stat = {
     id: d.id,
     name: d.methodName,
@@ -358,6 +373,7 @@ var frameStats = function(d) {
     gemName: d.gemName,
     frame: d.frame,
     samples: d.samples.size,
+    selfSamples: d.samples.size - childrenSize,
     ofZoom: inSet ? "no zoom" : "beyond zoom",
     ofParent: "No Parent ",
     ofTotal: ((d.samples.size / oMaxX) * 100).toFixed(2),
@@ -514,10 +530,36 @@ var zoom = function(d, options) {
   return false;
 }
 
+var showInfo = function(e){
+  var name = e.data.name;
+  var type = e.data.type;
+
+  var set = dataStats[type][name];
+
+  $modal = $("#info-modal");
+  $modal.find(".header").text(type + " " + name + " Info");
+
+  var stats = set.data.map(frameStats);
+  stats = stats.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
+
+  $modal.find('.content').html(template("info-table-template")({stats: stats}));
+
+  $modal.find(".search.icon").on("click", function() {
+    var id = parseInt($(this).data("id"), 10);
+    zoom(data[id]);
+    $modal.modal('hide');
+    return false;
+  });
+
+  $modal.modal('show');
+
+  return false;
+};
+
 var showBacktrace = function(d){
   var trace = backtrace(d);
 
-  $modal = $("#info-modal");
+  $modal = $("#backtrace-modal");
 
   $modal.find(".header").text("Backtrace Info");
   var stats = trace.map(frameStats)
@@ -976,7 +1018,8 @@ function renderLegend(type) {
   _.each(dataDisplay, function(display) {
     var html = $($.trim(template(type + "-row-template")(display)))
       .on("mouseover", {name: display.name, type: type}, selectElement)
-      .on("mouseout", {name: display.name, type: type}, deselectElement);
+      .on("mouseout", {name: display.name, type: type}, deselectElement)
+      .on("click", {name: display.name, type: type}, showInfo);
 
     html.find("span")
       .popup({
@@ -1097,7 +1140,7 @@ $("button[data-action=filter]").on("click", function() {
   return false;
 });
 
-$("#info-modal a.item").tab();
+$("#backtrace-modal a.item").tab();
 
 
 </script>
