@@ -349,6 +349,7 @@ var frameStats = function(d) {
   var i = info[byType][d.frame];
 
   visible = filteredParent(d);
+  inSet = dataStats["method"][d.methodName];
 
   var stat = {
     id: d.id,
@@ -357,19 +358,19 @@ var frameStats = function(d) {
     gemName: d.gemName,
     frame: d.frame,
     samples: d.samples.size,
-    ofZoom: "No Zoom ",
+    ofZoom: inSet ? "no zoom" : "beyond zoom",
     ofParent: "No Parent ",
     ofTotal: ((d.samples.size / oMaxX) * 100).toFixed(2),
     totalSamples: i.samples.size,
     allOfTotal: ((i.samples.size / oMaxX) * 100).toFixed(2),
-    calls: dataStats["method"][d.methodName].count
+    calls: inSet ? dataStats["method"][d.methodName].count : "beyond zoom"
   };
 
   if (visible) {
     stat['ofParent'] = ((d.samples.size / visible.samples.size) * 100).toFixed(2);
   }
 
-  if (currentZoom) {
+  if (inSet && currentZoom) {
     stat["ofZoom"] = ((d.samples.size / currentZoom.samples.size) * 100).toFixed(2);
   }
 
@@ -414,10 +415,10 @@ var deselectElement = function(e) {
 var backtrace = function(frame){
   frames = [frame];
 
-  var parent = visibleParent(frame)
+  var parent = filteredParent(frame)
   while (parent) {
     frames.push(parent);
-    parent = visibleParent(parent)
+    parent = filteredParent(parent)
   }
 
   return frames;
