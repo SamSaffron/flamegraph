@@ -206,7 +206,16 @@ var maxY = 0;
 
 var guessGem = function(frame)
 {
-  var split = frame.split('/gems/');
+  var split = frame.split('/lib\/ruby/');
+  if (split.length > 1) {
+    split = split[1].split("/")
+      if (split.length > 1) {
+        split = split[1].split(".")
+        return "ruby - " + split[0];
+      }
+  }
+
+  split = frame.split('/gems/');
   if(split.length == 1) {
     split = frame.split('/app/');
     if(split.length == 1) {
