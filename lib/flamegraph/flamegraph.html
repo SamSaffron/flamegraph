@@ -157,7 +157,7 @@
                 <td class="right aligned" > {{selfSamples}} </td>
                 <td class="right aligned"> {{ofSelfTotal}}% </td>
 
-                <td class="right aligned"> {{samples.size}} </td>
+                <td class="right aligned"> {{samplesLength}} </td>
                 <td class="right aligned"> {{ofTotal}}% </td>
 
 
@@ -196,7 +196,7 @@
                 <td class="right aligned"> {{selfSamples}} </td>
                 <td class="right aligned"> {{ofSelfTotal}}% </td>
 
-                <td class="right aligned"> {{samples.size}} </td>
+                <td class="right aligned"> {{samplesLength}} </td>
                 <td class="right aligned"> {{ofTotal}}% </td>
 
                 <td class="right aligned"> {{frames.length}} </td>
@@ -291,10 +291,11 @@ var storeOriginals = function(data) {
 }
 
 var setSamples = function(d) {
-  d.samples = new Set();
+  d.samples = {};
   for(var j=0; j < d.oWidth; j++){
-    d.samples.add(d.oX + j);
+    d.samples[d.oX + j] = 1;
   }
+  d.samplesLength = j;
 }
 
 $.each(data, function(){
@@ -358,12 +359,11 @@ var template = function(name) {
 var frameStats = function(d) {
   var i = info[byType][d.frame];
 
-  visible = filteredParent(d);
   inSet = dataStats["method"][d.methodName];
 
   var childrenSize = 0;
-  $.each(directFilteredChildren(d), function() {
-    childrenSize = childrenSize + this.samples.size;
+  $.each(d.filteredChildren || [], function() {
+    childrenSize = childrenSize + this.samplesLength;
   });
 
   var stat = {
@@ -372,22 +372,22 @@ var frameStats = function(d) {
     shortName: d.shortMethodName,
     gemName: d.gemName,
     frame: d.frame,
-    samples: d.samples.size,
-    selfSamples: d.samples.size - childrenSize,
+    samples: d.samplesLength,
+    selfSamples: d.samplesLength - childrenSize,
     ofZoom: inSet ? "no zoom" : "beyond zoom",
     ofParent: "No Parent ",
-    ofTotal: ((d.samples.size / oMaxX) * 100).toFixed(2),
-    totalSamples: i.samples.size,
-    allOfTotal: ((i.samples.size / oMaxX) * 100).toFixed(2),
+    ofTotal: ((d.samplesLength / oMaxX) * 100).toFixed(2),
+    totalSamples: i.samplesLength,
+    allOfTotal: ((i.samplesLength / oMaxX) * 100).toFixed(2),
     calls: inSet ? dataStats["method"][d.methodName].count : "beyond zoom"
   };
 
-  if (visible) {
-    stat['ofParent'] = ((d.samples.size / visible.samples.size) * 100).toFixed(2);
+  if (d.filteredParent) {
+    stat['ofParent'] = ((d.samplesLength / d.filteredParent.samplesLength) * 100).toFixed(2);
   }
 
   if (inSet && currentZoom) {
-    stat["ofZoom"] = ((d.samples.size / currentZoom.samples.size) * 100).toFixed(2);
+    stat["ofZoom"] = ((d.samplesLength / currentZoom.samplesLength) * 100).toFixed(2);
   }
 
   return stat;
@@ -398,7 +398,7 @@ var mouseover =  function(d) {
   var stat = frameStats(d);
 
   $('.info').html(template("info-table-template")({stats: [stat]})).show();
-  // $('.info').text( d.frame + " " + samplePercent(i.samples.size, d.topFrame ? d.topFrame.exclusiveCount : 0));
+  // $('.info').text( d.frame + " " + samplePercent(i.samplesLength, d.topFrame ? d.topFrame.exclusiveCount : 0));
   d3.selectAll("rect[method='" + d.methodName + "']")
     .attr('fill', function(d) { return "black"; })
     .attr('opacity',0.5);
@@ -456,9 +456,8 @@ $(window).keyup(function(e) {
     }
   } else if (e.keyCode == 189) {
     if (currentZoom) {
-      var visible = filteredParent(currentZoom);
-      if (visible) {
-        zoom(visible);
+      if (currentZoom.filteredParent) {
+        zoom(currentZoom.filteredParent);
       }
     }
   }
@@ -632,7 +631,7 @@ function analyzeData(data, type) {
     var stat = dataStats[type][group];
 
     if(!stat) {
-      dataStats[type][group] = stat = {count: 0, name: group, samples: new Set(), frames: [], data: []};
+      dataStats[type][group] = stat = {count: 0, name: group, samplesLength: 0, samples: {}, frames: [], data: []};
     }
 
 
@@ -640,8 +639,9 @@ function analyzeData(data, type) {
     stat.frames.push(this.frame);
     stat.data.push(this);
     for(var j=0; j < this.width; j++){
-      stat.samples.add(this.x + j);
+      stat.samples[this.x + j] = 1;
     }
+    stat.samplesLength = stat.samplesLength + j;
   });
 
   var totalGroupData = 0;
@@ -652,7 +652,7 @@ function analyzeData(data, type) {
 
   dataSorted[type] = _(dataStats[type]).pairs()
                             .sortBy(function(item){
-                                return -item[1].samples.size;
+                                return -item[1].samplesLength;
                               })
                             .map(function(item){return item[1]})
                             .value();
@@ -663,7 +663,7 @@ function analyzeData(data, type) {
     stat.color = colors[type][stat.name] = colors[type][stat.name] || rainbow(totalGroupData, currentIndex);
 
     for(var x=0; x < stat.frames.length; x++) {
-      info[type][stat.frames[x]] = info[type][stat.frames[x]] || {samples: new Set(), color: stat.color};
+      info[type][stat.frames[x]] = info[type][stat.frames[x]] || {samplesLength: 0, samples: {}, color: stat.color};
     }
 
     currentIndex += 1;
@@ -837,11 +837,12 @@ function processFrameInfo(data, type) {
 
     var info_frame = info[type][d.frame];
     if(!info_frame) {
-      info[type][d.frame] = info_frame = {samples: new Set(), color: color()};
+      info[type][d.frame] = info_frame = {samplesLength: 0, samples: {}, color: color()};
     }
     for(var j=0; j < d.width; j++){
-      info_frame.samples.add(d.x + j);
+      info_frame.samples[d.x + j] = 1;
     }
+    info_frame.samplesLength = info_frame.samplesLength + j;
   }
 }
 
@@ -869,6 +870,8 @@ function resetFilter() {
     var d = data[i];
     d.filteredIn = null;
     d.filteredOut = null;
+    d.filteredChildren = null;
+    d.filteredParent = null;
   }
 };
 
@@ -896,9 +899,9 @@ function filterDataByFrame(includedFilters, excludedFilters) {
 
       if (shouldInclude && !shouldExclude) {
         d.filteredIn = true;
-        var parent = filteredParent(d);
-        if (parent) {
-          d.y = parent.y + 1;
+        d.filteredParent = filteredParent(d);
+        if (d.filteredParent) {
+          d.y = d.filteredParent.y + 1;
         }
       } else {
         d.filteredOut = true;
@@ -977,8 +980,10 @@ function drawData(data, options) {
     .attr("stroke", "black")
     .attr("stroke-width", 0.25);
 
-  renderLegend("gem");
-  renderLegend("method");
+  setTimeout(function() {
+    renderLegend("gem");
+    renderLegend("method");
+  }, 200);
 }
 
 
@@ -988,31 +993,31 @@ function renderLegend(type) {
   var maxPoint = oMaxX;
 
   if (currentZoom) {
-    maxPoint = currentZoom.samples.size;
+    maxPoint = currentZoom.samplesLength;
   }
 
   $.each(dataSorted[type], function() {
-    this.ofTotal = ((this.samples.size / maxPoint) * 100).toFixed(2);
+    this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
     this.shortName = guessShortMethod(this.name);
     var sampleSize = 0;
     var childrenSize = 0;
     $.each(this.data || [], function() {
       var d = this;
-      sampleSize = sampleSize + this.samples.size;
-      $.each(directFilteredChildren(this), function() {
-        childrenSize = childrenSize + this.samples.size;
+      sampleSize = sampleSize + this.samplesLength;
+      d.filteredChildren = d.filteredChildren || directFilteredChildren(d);
+      $.each(d.filteredChildren, function() {
+        childrenSize = childrenSize + this.samplesLength;
       });
     });
     this.selfSamples = sampleSize - childrenSize;
     this.ofSelfTotal = ((this.selfSamples / maxPoint) * 100).toFixed(2);
-    this.ofTotal = ((this.samples.size / maxPoint) * 100).toFixed(2);
+    this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
   });
 
   var dataDisplay = dataSorted[type].filter(function(s) {
     return s.ofSelfTotal > 0.5;
   });
-   dataDisplay = dataDisplay.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
-  // dataDisplay = dataDisplay.sort(function(a, b) { return b.count - a.count; });
+  dataDisplay = dataDisplay.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
 
   $("#" + type + "s-table tbody").children().remove();
   _.each(dataDisplay, function(display) {
