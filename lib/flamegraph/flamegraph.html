@@ -248,7 +248,7 @@ var data = /**DATA**/;
     var guessGem = function(frame)
     {
       var split = frame.split('/lib\/ruby/');
-      if (split.length > 1) {
+      if (split.length > 1 && !frame.includes("/gems/")) {
         split = split[1].split("/")
           if (split.length > 1) {
             split = split[1].split(".")
@@ -981,6 +981,12 @@ var data = /**DATA**/;
 
       rects.exit().remove();
 
+
+      var stroke = 0.25;
+      if (maxY - minY > 250) {
+        stroke = 0;
+      }
+
       rects
         .each(function(d) { d.node = this; } )
         .attr("frameId", function(d) { return d.id } )
@@ -994,7 +1000,7 @@ var data = /**DATA**/;
         .attr("opacity", function(d){ return d.opacityFactor; })
         .attr("cursor", "pointer")
         .attr("stroke", "black")
-        .attr("stroke-width", 0.25);
+        .attr("stroke-width", stroke);
 
       setTimeout(function() {
         renderLegend("gem");
