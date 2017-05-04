@@ -657,12 +657,12 @@ var data = /**DATA**/;
         for(var j=0; j < this.width; j++){
           stat.samples[this.x + j] = 1;
         }
-        stat.samplesLength = Object.keys(stat.samples).length;
       });
 
       var totalGroupData = 0;
       $.each(dataStats[type], function(k,stat){
         totalGroupData++;
+        stat.samplesLength = Object.keys(stat.samples).length;
       });
 
 
@@ -674,7 +674,7 @@ var data = /**DATA**/;
                                 .value();
 
       var currentIndex = 0;
-      _.each(dataSorted[type], function(stat){
+      var colorStats = function(stat){
 
         stat.color = colors[type][stat.name] = colors[type][stat.name] || rainbow(totalGroupData, currentIndex);
 
@@ -683,8 +683,9 @@ var data = /**DATA**/;
         }
 
         currentIndex += 1;
-      });
+      };
 
+      _.each(dataSorted[type], colorStats);
     }
 
     var directFilteredChildren = function(d) {
