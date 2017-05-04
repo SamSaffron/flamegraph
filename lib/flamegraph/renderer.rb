@@ -11,14 +11,15 @@ class Flamegraph::Renderer
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        embed("semantic.min.css", "jquery.min.js","d3.min.js","lodash.min.js", "semantic.min.js", "handlebars.min.js")
+        embed("semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", "handlebars.min.js", "keyboard.min.js")
       else
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/1.3.1/lodash.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/keyboardjs/2.3.3/keyboard.min.js"></script>'
       end
 
     body.sub!("/**DATA**/", ::JSON.generate(graph_data));
@@ -86,7 +87,7 @@ class Flamegraph::Renderer
       if file =~ /\.js$/
         out << "<script src='data:text/javascript;base64," << Base64.encode64(body) << "'></script>"
       elsif file =~ /\.css$/
-        out << "<link rel='stylesheet' href='data:css/javascript;base64," << Base64.encode64(body) << "' />"
+        out << "<link rel='stylesheet' href='data:text/css;base64," << Base64.encode64(body) << "' />"
       end
     end
     out
