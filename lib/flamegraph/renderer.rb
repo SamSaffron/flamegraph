@@ -11,7 +11,7 @@ class Flamegraph::Renderer
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        embed("semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", "handlebars.min.js", "keyboard.min.js", "randomColor.min.js")
+        embed("semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", "handlebars.min.js", "keyboard.min.js", "randomColor.min.js", "clipboard.min.js")
       else
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
@@ -20,7 +20,8 @@ class Flamegraph::Renderer
 <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.0.6/handlebars.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/keyboardjs/2.3.3/keyboard.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.2/randomColor.min.js"></script>'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.2/randomColor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.6.0/clipboard.min.js"></script>'
       end
 
     body.sub!("/**DATA**/", ::JSON.generate(graph_data));

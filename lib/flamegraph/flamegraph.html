@@ -7,6 +7,21 @@
 
   <title>Flame Graph of Page</title>
   <style>
+    [data-blink=true] {
+      animation: blink-animation 0.75s steps(5, start) infinite;
+      -webkit-animation: blink-animation 0.75s steps(5, start) infinite;
+    }
+    @keyframes blink-animation {
+      to {
+        visibility: hidden;
+      }
+    }
+    @-webkit-keyframes blink-animation {
+      to {
+        visibility: hidden;
+      }
+    }
+
     .code {
       font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
     }
@@ -67,7 +82,7 @@
           <td > {{allOfTotal}}% </td>
         </tr>
         <tr>
-          <td colspan="11"> {{frame}} </td>
+          <td colspan="11"> <i class="copy icon" data-clipboard-text="{{filePath}}"></i> {{frame}} </td>
         </tr>
       {{/each}}
       </tbody>
@@ -97,6 +112,7 @@
         <p><code>b</code> - backtrace of frame</p>
 
         <h5>Hover Over Gem or Method Listing</h5>
+        <p><code>a</code> - animate the highlighted frames to blink</p>
         <p><code>z</code> - zoom to frame with most samples in self</p>
         <p><code>b</code> - backtrace of frame with most samples in self</p>
         <p><code>f</code> <code>i</code> - add/remove from include filter</p>
@@ -304,6 +320,11 @@ var data = /**DATA**/;
       return "";
     }
 
+    var guessFilePath = function(frame) {
+      var split = frame.split(":in");
+      return split[0];
+    }
+
     var storeOriginals = function(data) {
       for(var i=0; i < data.length; i++) {
         var d = data[i];
@@ -347,9 +368,9 @@ var data = /**DATA**/;
     oMaxY = maxY;
 
     var width = $("#main").width();
-    var height = ($(window).height() / 1.2);
-
+    var height = ($(window).height() / 1.35);
     $('.graph').width(width).height(height);
+    $('#legend').height($(window).height() - height).css({overflow: "scroll"});
 
     var xScale = d3.scale.linear()
       .domain([0, maxX])
@@ -396,11 +417,14 @@ var data = /**DATA**/;
         childrenSize = childrenSize + this.samplesLength;
       });
 
+      d.filePath = d.filePath || guessFilePath(d.frame);
+
       var stat = {
         id: d.id,
         name: d.methodName,
         shortName: d.shortMethodName,
         gemName: d.gemName,
+        filePath: d.filePath,
         frame: d.frame,
         samples: d.samplesLength,
         selfSamples: d.samplesLength - childrenSize,
@@ -462,6 +486,7 @@ var data = /**DATA**/;
       var name = e.data.name;
       d3.selectAll("rect[" + e.data.type + "='" + name + "']")
         .attr('fill', function(d) { return d.fill; })
+        .attr('data-blink', "")
         .attr('opacity', function(d) { return d.opacityFactor });
       return false;
     };
@@ -1190,6 +1215,13 @@ var data = /**DATA**/;
 
           showBacktrace(data[findTopElement(currentElement).id]);
         });
+
+        keyboardJS.bind('a', function(e) {
+          if (!currentElement) return;
+
+          d3.selectAll("rect[" + type + "='" + currentElement + "']")
+            .attr('data-blink', "true");
+        });
       });
     });
 
@@ -1260,6 +1292,8 @@ var data = /**DATA**/;
     }).blur(function() {
       inField = false;
     });
+
+    new Clipboard('.icon.copy');
 
   </script>
 </body>
