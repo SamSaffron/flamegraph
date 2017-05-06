@@ -380,18 +380,6 @@ var data = /**DATA**/;
 
     var parsedNames = {}
 
-    var samplePercent = function(samples, exclusive){
-      var info = " (" + samples +
-        " sample" + (samples == 1 ? "" : "s") + " - " +
-        ((samples / oMaxX) * 100).toFixed(2) + "%) ";
-      if (exclusive) {
-        info += " (" + exclusive +
-          " exclusive - " +
-        ((exclusive / oMaxX) * 100).toFixed(2) + "%) ";
-      }
-      return info;
-    }
-
     var templates = {};
     var template = function(name) {
       templates[name] = templates[name] || Handlebars.compile($("#" + name).html());
@@ -607,28 +595,6 @@ var data = /**DATA**/;
       return false;
     };
 
-    // http://stackoverflow.com/a/7419630
-    var rainbow = function(numOfSteps, step) {
-        // This function generates vibrant, "evenly spaced" colours (i.e. no clustering). This is ideal for creating easily distiguishable vibrant markers in Google Maps and other apps.
-        // Adam Cole, 2011-Sept-14
-        // HSV to RBG adapted from: http://mjijackson.com/2008/02/rgb-to-hsl-and-rgb-to-hsv-color-model-conversion-algorithms-in-javascript
-        var r, g, b;
-        var h = step / numOfSteps;
-        var i = ~~(h * 6);
-        var f = h * 6 - i;
-        var q = 1 - f;
-        switch(i % 6){
-            case 0: r = 1, g = f, b = 0; break;
-            case 1: r = q, g = 1, b = 0; break;
-            case 2: r = 0, g = 1, b = f; break;
-            case 3: r = 0, g = q, b = 1; break;
-            case 4: r = f, g = 0, b = 1; break;
-            case 5: r = 1, g = 0, b = q; break;
-        }
-        var c = "#" + ("00" + (~ ~(r * 255)).toString(16)).slice(-2) + ("00" + (~ ~(g * 255)).toString(16)).slice(-2) + ("00" + (~ ~(b * 255)).toString(16)).slice(-2);
-        return (c);
-    }
-
     var byType = "method";
 
     var dataStats = {
@@ -685,9 +651,10 @@ var data = /**DATA**/;
                                 .value();
 
       var currentIndex = 0;
+      var rColors = randomColor({count: totalGroupData});
       var colorStats = function(stat){
 
-        stat.color = colors[type][stat.name] = colors[type][stat.name] || rainbow(totalGroupData, currentIndex);
+        stat.color = colors[type][stat.name] = colors[type][stat.name] || rColors[currentIndex];
 
         for(var x=0; x < stat.frames.length; x++) {
           info[type][stat.frames[x]] = info[type][stat.frames[x]] || {samplesLength: 0, samples: {}, color: stat.color};
@@ -726,9 +693,7 @@ var data = /**DATA**/;
         var depth = d.oY;
 
         d.parent = null;
-        d.oParent = null;
         d.children = [];
-        d.oChildren = [];
 
         if (d.oY == 1) {
           continue;
@@ -738,7 +703,6 @@ var data = /**DATA**/;
           var x = i;
           while(x >= 0){
             data[x].children = data[x].children || [];
-            data[x].oChildren = data[x].oChildren || [];
 
             if (
                 data[x].oY === depth - 1  
@@ -747,49 +711,52 @@ var data = /**DATA**/;
               //   data[x].oX + data[x].oWidth >= d.oX + d.oWidth
                ) {
               d.parent = data[x];
-              d.oParent = data[x];
+              d.allParents = [];
+              var parent = d.parent;
+              while (parent) {
+                d.allParents.push(parent);
+                parent.allChildren = parent.allChildren || [];
+                parent.allChildren.push(d);
+                parent = parent.parent;
+              }
               data[x].children.push(d);
-              data[x].oChildren.push(d);
               break;
             }
 
             x--;
           }
 
-          if (!d.parent) {
-          }
-
           var dEndPoint = d.oX + d.oWidth;
           var parentEndPoint = d.parent.oX + d.parent.oWidth;
-         if (parentEndPoint < dEndPoint) {
-           var new_element = jQuery.extend({}, d);
-           new_element.children = [];
-           new_element.parent = null;
-           new_element.samples = null;
-      
-           var oldWidth = d.oWidth;
-           d.oWidth = d.width = parentEndPoint - d.oX;
-           new_element.oWidth = new_element.width = oldWidth - d.oWidth;
-      
-           new_element.oX = new_element.x = parentEndPoint;
-      
-           setSamples(d);
-           setSamples(new_element);
-
-           var z = i;
-           while(z < data.length - 1) {
-             if (data[z].oY == d.oY - 1) {
-               break;
-             }
-
-             z++;
-           }
-
-           new_element.id = z + 1;
-
-           data.splice(z + 1, 0, new_element);
-           length = data.length;
-         }
+          if (parentEndPoint < dEndPoint) {
+            var new_element = jQuery.extend({}, d);
+            new_element.children = [];
+            new_element.parent = null;
+            new_element.samples = null;
+            
+            var oldWidth = d.oWidth;
+            d.oWidth = d.width = parentEndPoint - d.oX;
+            new_element.oWidth = new_element.width = oldWidth - d.oWidth;
+            
+            new_element.oX = new_element.x = parentEndPoint;
+            
+            setSamples(d);
+            setSamples(new_element);
+            
+            var z = i;
+            while(z < data.length - 1) {
+              if (data[z].oY == d.oY - 1) {
+                break;
+              }
+            
+              z++;
+            }
+            
+            new_element.id = z + 1;
+            
+            data.splice(z + 1, 0, new_element);
+            length = data.length;
+          }
 
           if (d.parent) {
             break;
@@ -808,40 +775,8 @@ var data = /**DATA**/;
       }
     }
 
-    var setAllChildren = function(node) {
-      if (node.children && node.children.length > 0) {
-        for(var i = 0; i < node.children.length; i++) {
-          setAllChildren(node.children[i]);
-        }
-      } else {
-        node.allChildren = [];
-        return;
-      }
-
-      node.allChildren = [];
-      node.allChildren = node.allChildren.concat(node.children);
-      for(var i = 0; i < node.children.length; i++) {
-        node.allChildren = node.allChildren.concat(node.children[i].allChildren);
-      }
-    }
-
-    var setAllParents = function(node) {
-      if (node.parent) {
-        setAllParents(node.parent);
-      } else {
-        node.allParents = [];
-        return;
-      }
-
-      if (node.allParents) {
-        return;
-      }
-
-      node.allParents = [node.parent].concat(node.parent.allParents);
-    }
-
-    function setMaxX(data) {
-      maxX = d3.max(zoomedAndFilteredData(data), function(d) { return d.x + d.width});
+    function setMaxX(data, zoomedAndFiltered) {
+      maxX = d3.max(zoomedAndFiltered, function(d) { return d.x + d.width});
 
       xScale = d3.scale.linear()
         .domain([0, maxX])
@@ -850,11 +785,11 @@ var data = /**DATA**/;
       return maxX;
     }
 
-    function setMaxY(data) {
+    function setMaxY(data, zoomedAndFiltered) {
       maxY = -1;
       minY = Infinity;
 
-      var filteredData = zoomedAndFilteredData(data).filter(function(d) { return xScale(d.width) > displayWidth });
+      var filteredData = zoomedAndFiltered.filter(function(d) { return xScale(d.width) > displayWidth });
 
       maxY = d3.max(filteredData, function(d) { return d.y; });
       minY = d3.min(filteredData, function(d) { return d.y; });
@@ -871,9 +806,6 @@ var data = /**DATA**/;
         var d = data[i];
 
         var info_frame = info[type][d.frame];
-        if(!info_frame) {
-          info[type][d.frame] = info_frame = {samplesLength: 0, samples: {}, color: color()};
-        }
         for(var j=0; j < d.width; j++){
           info_frame.samples[d.x + j] = 1;
         }
@@ -882,9 +814,10 @@ var data = /**DATA**/;
     }
 
     function processData(data) {
+      zoomedAndFiltered = zoomedAndFilteredData(data);
 
-      setMaxX(data);
-      setMaxY(data);
+      setMaxX(data, zoomedAndFiltered);
+      setMaxY(data, zoomedAndFiltered);
 
       for(var i=0; i < data.length; i++) {
         var d = data[i];
@@ -1121,17 +1054,6 @@ var data = /**DATA**/;
 
     storeOriginals(data);
     setRelations(data);
-
-    var top_levels = data.filter(function(d) { return d.y == 1; });
-    $.each(top_levels, function() {
-      setAllChildren(this);
-    });
-
-    var bottom_levels = data.filter(function(d) { return !d.children || d.children.length == 0 });
-    $.each(bottom_levels, function() {
-      setAllParents(this);
-    });
-
 
     analyzeData(data, "method");
     processFrameInfo(data, "method");
