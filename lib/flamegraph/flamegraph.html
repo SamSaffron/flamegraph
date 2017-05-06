@@ -312,10 +312,19 @@ var data = /**DATA**/;
         d.oX = d.oX || d.x;
         d.oY = d.oY || d.y;
 
-        d.methodName = guessFullMethod(d.frame);
-        d.shortMethodName = guessShortMethod(d.methodName);
-        d.gemName = guessGem(d.frame);
-        d.fileName = guessFile(d.frame);
+        if (parsedNames[d.frame]) {
+          d.methodName = parsedNames[d.frame].methodName;
+          d.shortMethodName = parsedNames[d.frame].shortMethodName;
+          d.gemName = parsedNames[d.frame].gemName;
+          d.fileName = parsedNames[d.frame].fileName;
+        } else {
+          parsedNames[d.frame] = {};
+          parsedNames[d.frame].methodName = d.methodName = guessFullMethod(d.frame);
+          parsedNames[d.frame].shortMethodName = d.shortMethodName = guessShortMethod(d.methodName);
+          parsedNames[d.frame].gemName = d.gemName = guessGem(d.frame);
+          parsedNames[d.frame].fileName = d.fileName = guessFile(d.frame);
+        }
+
         d.opacityFactor = 1;
         setSamples(d);
       }
@@ -368,6 +377,8 @@ var data = /**DATA**/;
       gem: {},
       method: {}
     };
+
+    var parsedNames = {}
 
     var samplePercent = function(samples, exclusive){
       var info = " (" + samples +
@@ -581,7 +592,7 @@ var data = /**DATA**/;
       $modal.find('.backtrace').html(template("info-table-template")({stats: stats}));
 
 
-      stats = directFilteredChildren(d).map(frameStats);
+      stats = d.filteredChildren.map(frameStats);
       $modal.find('.direct-calls').html(template("info-table-template")({stats: stats}));
 
       $modal.find(".search.icon").on("click", function() {
@@ -689,6 +700,10 @@ var data = /**DATA**/;
     }
 
     var directFilteredChildren = function(d) {
+      if (!anyActiveFilters()) {
+        return d.children;
+      }
+
       return filteredChildren(d).filter(function(c) { return c.y == d.y + 1 });
     };
 
@@ -744,16 +759,19 @@ var data = /**DATA**/;
           if (!d.parent) {
           }
 
-         if (d.parent.oWidth < d.oWidth) {
+          var dEndPoint = d.oX + d.oWidth;
+          var parentEndPoint = d.parent.oX + d.parent.oWidth;
+         if (parentEndPoint < dEndPoint) {
            var new_element = jQuery.extend({}, d);
            new_element.children = [];
            new_element.parent = null;
            new_element.samples = null;
       
-           new_element.oWidth = new_element.width = d.oWidth - d.parent.oWidth;
-           d.oWidth = d.width = d.parent.oWidth;
+           var oldWidth = d.oWidth;
+           d.oWidth = d.width = parentEndPoint - d.oX;
+           new_element.oWidth = new_element.width = oldWidth - d.oWidth;
       
-           new_element.oX = new_element.x = d.oX + d.oWidth;
+           new_element.oX = new_element.x = parentEndPoint;
       
            setSamples(d);
            setSamples(new_element);
@@ -915,16 +933,17 @@ var data = /**DATA**/;
           }
 
           if (shouldInclude && !shouldExclude) {
+            d.y = d.oY;
             d.filteredIn = true;
             d.filteredParent = filteredParent(d);
+            d.filteredChildren = d.filteredChildren || [];
             if (d.filteredParent) {
+              d.filteredParent.filteredChildren.push(d);
               d.y = d.filteredParent.y + 1;
             }
           } else {
             d.filteredOut = true;
-
-            d.allChildren = d.allChildren || [];
-
+            d.y = -1;
           }
         }
       }
@@ -980,7 +999,7 @@ var data = /**DATA**/;
           .on("mouseover", mouseover)
           .on("mouseout", mouseout);
 
-      rects.exit().remove();
+      rects.exit().attr("width", 0);
 
 
       var stroke = 0.25;
@@ -1006,7 +1025,7 @@ var data = /**DATA**/;
       setTimeout(function() {
         renderLegend("gem");
         renderLegend("method");
-      }, 200);
+      }, 10);
     }
 
 
@@ -1038,7 +1057,7 @@ var data = /**DATA**/;
       });
 
       var dataDisplay = dataSorted[type].filter(function(s) {
-        return s.ofSelfTotal > 0.5;
+        return s.ofSelfTotal > 0.1;
       });
       dataDisplay = dataDisplay.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
 
