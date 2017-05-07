@@ -107,14 +107,16 @@
         <p><code>f</code> <code>c</code> - clear existing filters</p>
         <p><code>f</code> <code>r</code> - restore previous filters</p>
 
-        <h5>Hover Graph Frame</h5>
+        <h5>Hover Over Graph Frame</h5>
         <p><code>z</code> - zoom to frame</p>
         <p><code>b</code> - backtrace of frame</p>
+        <p><code>p</code> - copy file path of frame into clipboard</p>
 
         <h5>Hover Over Gem or Method Listing</h5>
         <p><code>a</code> - animate the highlighted frames to blink</p>
         <p><code>z</code> - zoom to frame with most samples in self</p>
         <p><code>b</code> - backtrace of frame with most samples in self</p>
+        <p><code>p</code> - copy file path of frame with most samples into clipboard</p>
         <p><code>f</code> <code>i</code> - add/remove from include filter</p>
         <p><code>f</code> <code>e</code> - add/remove from exclude filter</p>
         <br/>
@@ -447,6 +449,15 @@ var data = /**DATA**/;
       return stat;
     }
 
+    var copyToClipboard = function(text) {
+      var clip = new Clipboard("lala", {
+        text: function() { return text; },
+        action: function() { return "copy"; },
+        target: function() { return undefined; }
+      });
+      clip.onClick({});
+    }
+
     var mouseover = function(d) {
       keyboardJS.setContext("frame");
       currentFrame = d;
@@ -719,6 +730,7 @@ var data = /**DATA**/;
 
         d.parent = null;
         d.children = [];
+        d.allParents = [];
 
         if (d.oY == 1) {
           continue;
@@ -736,7 +748,6 @@ var data = /**DATA**/;
               //   data[x].oX + data[x].oWidth >= d.oX + d.oWidth
                ) {
               d.parent = data[x];
-              d.allParents = [];
               var parent = d.parent;
               while (parent) {
                 d.allParents.push(parent);
@@ -1216,6 +1227,12 @@ var data = /**DATA**/;
           showBacktrace(data[findTopElement(currentElement).id]);
         });
 
+        keyboardJS.bind('p', function(e) {
+          if (!currentElement) return;
+
+          copyToClipboard(findTopElement(currentElement).filePath);
+        });
+
         keyboardJS.bind('a', function(e) {
           if (!currentElement) return;
 
@@ -1282,6 +1299,11 @@ var data = /**DATA**/;
 
       keyboardJS.bind("b", function(e) {
         showBacktrace(currentFrame);
+        keyboardJS.setContext("");
+      });
+
+      keyboardJS.bind("p", function(e) {
+        copyToClipboard(currentFrame.filePath)
         keyboardJS.setContext("");
       });
     });
