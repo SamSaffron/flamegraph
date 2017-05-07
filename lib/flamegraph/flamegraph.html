@@ -108,12 +108,13 @@
         <p><code>f</code> <code>r</code> - restore previous filters</p>
 
         <h5>Hover Over Graph Frame</h5>
+        <p><code>a</code> - animate frames of same method to blink, toggles on/off</p>
         <p><code>z</code> - zoom to frame</p>
         <p><code>b</code> - backtrace of frame</p>
         <p><code>p</code> - copy file path of frame into clipboard</p>
 
         <h5>Hover Over Gem or Method Listing</h5>
-        <p><code>a</code> - animate the highlighted frames to blink</p>
+        <p><code>a</code> - animate the highlighted frames to blink, toggles on/off</p>
         <p><code>z</code> - zoom to frame with most samples in self</p>
         <p><code>b</code> - backtrace of frame with most samples in self</p>
         <p><code>p</code> - copy file path of frame with most samples into clipboard</p>
@@ -156,7 +157,7 @@
       </script>
       <div class="four wide column">
         <div class="ui segment">
-          <button class="ui button" data-action="resetZoom">Reset Zoom</button>
+          <button class="ui disabled button" data-action="resetZoom">No Zoom</button>
           <div class="ui clearing divider hidden"></div>
           <div id="includedFilters" class="">
           </div>
@@ -477,6 +478,7 @@ var data = /**DATA**/;
       var i = info[byType][d.frame];
       $('.ui.footer').hide().children().remove();
       d3.selectAll("rect[method='" + d.methodName + "']")
+        .attr('data-blink', "")
         .attr('fill', function(d) { return d.fill; })
         .attr('opacity', function(f) { return f.opacityFactor });
     };
@@ -572,6 +574,9 @@ var data = /**DATA**/;
           this.zoomed = true; 
           this.x = this.x - d.oX + 1;
         });
+        $("[data-action=resetZoom]").removeClass("disabled").text("Reset Zoom");
+      } else {
+        $("[data-action=resetZoom]").addClass("disabled").text("No Zoom");
       }
 
       processData(data);
@@ -1108,16 +1113,15 @@ var data = /**DATA**/;
         .attr("fill", function(d){ return d.fill; })
         .attr("opacity", function(d){ return d.opacityFactor; });
 
+      $("[data-action=color]").css({color: "black"});
+      $("[data-type=" + byType + "][data-action=color]").css({color: "red"});
     };
 
     $("[data-action=color]").on("click", function() {
       colorFrames($(this).data("type"));
-      $("[data-action=color]").css({color: "black"});
-      $(this).css({color: "red"});
     });
 
-    $("[data-action=color][data-type=" + byType + "]").trigger("click");
-
+    colorFrames(byType);
 
     $("button[data-action=resetZoom]").on("click", function() {
       resetZoom();
@@ -1236,8 +1240,14 @@ var data = /**DATA**/;
         keyboardJS.bind('a', function(e) {
           if (!currentElement) return;
 
-          d3.selectAll("rect[" + type + "='" + currentElement + "']")
-            .attr('data-blink', "true");
+          var blink = "true";
+          var matcher = "rect[" + type + "='" + currentElement + "']";
+
+          if ($(matcher + "[data-blink=true]").length) {
+            blink = "";
+          }
+
+          d3.selectAll(matcher).attr('data-blink', blink);
         });
       });
     });
@@ -1295,6 +1305,18 @@ var data = /**DATA**/;
         zoom(currentFrame);
         keyboardJS.setContext("");
 
+      });
+
+      keyboardJS.bind("a", function(e) {
+        if (!currentFrame) return;
+        var blink = "true";
+        var matcher = "rect[method='" + currentFrame.methodName + "']";
+
+        if ($(matcher + "[data-blink=true]").length) {
+          blink = "";
+        }
+
+        d3.selectAll(matcher).attr('data-blink', blink);
       });
 
       keyboardJS.bind("b", function(e) {
