@@ -11,7 +11,10 @@ class Flamegraph::Renderer
     body = read('flamegraph.html')
     body.sub! "/**INCLUDES**/",
       if embed_resources
-        embed("semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", "handlebars.min.js", "keyboard.min.js", "randomColor.min.js", "clipboard.min.js")
+        embed(
+          "semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", 
+          "handlebars.min.js", "keyboard.min.js", "randomColor.min.js", "clipboard.min.js", "tinycolor.min.js"
+        )
       else
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
