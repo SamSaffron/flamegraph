@@ -222,7 +222,7 @@
           <tbody>
           </tbody>
           <script id="gem-row-template" type="text/x-handlebars-template">
-            <tr style="background-color: {{color}}" >
+            <tr style="background-color: {{color}}; color: {{textColor}}" >
               <td > {{name}} </td>
 
               <td class="right aligned" > {{selfSamples}} </td>
@@ -254,12 +254,8 @@
           <tbody>
           </tbody>
           <script id="method-row-template" type="text/x-handlebars-template">
-            <tr style="background-color: {{color}}" >
-              <td>
-                <span class="popme">
-                  {{name}}
-                </span>
-              </td>
+            <tr style="background-color: {{color}}; color: {{textColor}}" >
+              <td> {{name}} </td>
 
               <td class="right aligned"> {{selfSamples}} </td>
               <td class="right aligned"> {{ofSelfTotal}}% </td>
@@ -836,15 +832,6 @@ var data = /**DATA**/;
       }
     }
 
-    var hexToRgb = function(hex) {
-      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-      } : null;
-    }
-
     function setMaxX(data, zoomedAndFiltered) {
       maxX = d3.max(zoomedAndFiltered, function(d) { return d.x + d.width});
 
@@ -900,12 +887,8 @@ var data = /**DATA**/;
         var info_frame = info[byType][d.frame];
         d.fill = info_frame.color;
 
-        // from: http://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
-        var rgb = hexToRgb(d.fill);
-        var o = Math.round(((rgb.r * 299) +
-              (rgb.b * 587) +
-              (rgb.g * 114)) / 1000);
-        d.textColor = (o > 145) ? 'black' : 'lightyellow';
+        var color = tinycolor(d.fill);
+        d.textColor = (color.isLight()) ? "black" : "lightyellow";
 
       }
     }
@@ -1085,6 +1068,8 @@ var data = /**DATA**/;
         this.selfSamples = sampleSize - childrenSize;
         this.ofSelfTotal = ((this.selfSamples / maxPoint) * 100).toFixed(2);
         this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
+        var color = tinycolor(this.color);
+        this.textColor = (color.isLight()) ? "black" : "lightyellow";
       });
 
       var dataDisplay = dataSorted[type].filter(function(s) {
