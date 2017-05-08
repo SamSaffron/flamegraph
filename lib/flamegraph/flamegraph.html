@@ -7,6 +7,11 @@
 
   <title>Flame Graph of Page</title>
   <style>
+    .graph {
+      position: relative;
+      border-bottom: 1px solid black;
+    }
+
     [data-blink=true] {
       animation: blink-animation 0.75s steps(5, start) infinite;
       -webkit-animation: blink-animation 0.75s steps(5, start) infinite;
@@ -43,6 +48,18 @@
       border-radius: 3px;
       background-color: rgba(0, 0, 0, 0.06);
       padding: 3px 4px;
+    }
+
+    .frame {
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+    }
+
+    .frame span {
+      position: absolute;
+      bottom: 0px;
+      left: 3px;
     }
   </style>
 </head>
@@ -89,7 +106,7 @@
     </table>
   </script>
 
-  <div id="main" class="ui fluid container" style="padding: 5px;">
+  <div id="main" class="ui fluid container" style="padding: 7px;">
     <div class="graph" oncontextmenu="return false;"></div>
 
     <div id="keyboard-modal" class="ui modal" >
@@ -383,13 +400,9 @@ var data = /**DATA**/;
         .domain([0, maxY])
         .range([0,height]);
 
-    var svg = d3.select(".graph")
-                        .append("svg")
+    var graph = d3.select(".graph")
                         .attr("width", "100%")
-                        .attr("height", "100%")
-                        .attr("pointer-events", "all")
-                        .append('svg:g')
-                        .append('svg:g');
+                        .attr("height", "100%");
 
     var color = function() {
       var r = parseInt(205 + Math.random() * 50);
@@ -466,9 +479,10 @@ var data = /**DATA**/;
       var stat = frameStats(d);
 
       $('.ui.footer').html(template("info-table-template")({stats: [stat]})).show();
-      d3.selectAll("rect[method='" + d.methodName + "']")
-        .attr('fill', function(d) { return "black"; })
-        .attr('opacity',0.5);
+      d3.selectAll("div.frame[method='" + d.methodName + "']")
+        .style('background-color', "black")
+        .style('color', "white")
+        .style('opacity', 0.5);
     };
 
     var mouseout = function(d) {
@@ -477,19 +491,20 @@ var data = /**DATA**/;
 
       var i = info[byType][d.frame];
       $('.ui.footer').hide().children().remove();
-      d3.selectAll("rect[method='" + d.methodName + "']")
-        .attr('data-blink', "")
-        .attr('fill', function(d) { return d.fill; })
-        .attr('opacity', function(f) { return f.opacityFactor });
+      d3.selectAll("div.frame[method='" + d.methodName + "']")
+        .style('background-color', function(d) { return d.fill; })
+        .style('color', function(d) { return d.textColor; })
+        .style('opacity', function(f) { return f.opacityFactor });
     };
 
     var selectElement = function(e) {
       keyboardJS.setContext(e.data.type);
       var name = e.data.name;
       currentElement = name;
-      d3.selectAll("rect[" + e.data.type +"='" + name + "']")
-        .attr('fill', function(d) { return "black"; })
-        .attr('opacity',0.5);
+      d3.selectAll("div.frame[" + e.data.type +"='" + name + "']")
+        .style('background-color', "black")
+        .style('color', "black")
+        .style('opacity', 0.5);
       return false;
     };
 
@@ -497,10 +512,11 @@ var data = /**DATA**/;
       keyboardJS.setContext('');
       currentElement = null;
       var name = e.data.name;
-      d3.selectAll("rect[" + e.data.type + "='" + name + "']")
-        .attr('fill', function(d) { return d.fill; })
+      d3.selectAll("div.frame[" + e.data.type + "='" + name + "']")
         .attr('data-blink', "")
-        .attr('opacity', function(d) { return d.opacityFactor });
+        .style('background-color', function(d) { return d.fill; })
+        .style('color', function(d) { return d.textColor; })
+        .style('opacity', function(d) { return d.opacityFactor });
       return false;
     };
 
@@ -816,6 +832,15 @@ var data = /**DATA**/;
       }
     }
 
+    var hexToRgb = function(hex) {
+      var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : null;
+    }
+
     function setMaxX(data, zoomedAndFiltered) {
       maxX = d3.max(zoomedAndFiltered, function(d) { return d.x + d.width});
 
@@ -870,6 +895,13 @@ var data = /**DATA**/;
 
         var info_frame = info[byType][d.frame];
         d.fill = info_frame.color;
+
+        // from: http://stackoverflow.com/questions/11867545/change-text-color-based-on-brightness-of-the-covered-background-area
+        var rgb = hexToRgb(d.fill);
+        var o = Math.round(((rgb.r * 299) +
+              (rgb.b * 587) +
+              (rgb.g * 114)) / 1000);
+        d.textColor = (o > 145) ? 'black' : 'lightyellow';
 
       }
     }
@@ -963,22 +995,27 @@ var data = /**DATA**/;
 
       filteredData = filteredData.filter(display_width_filter);
 
-      var rects = svg.selectAll("rect")
+      var rects = graph.selectAll("div")
         .data(filteredData);
 
         rects.enter()
-          .append("rect")
+          .append("div")
+          .attr("class", "frame")
           .on("contextmenu", showBacktrace)
           .on("click", zoom)
           .on("mouseover", mouseover)
           .on("mouseout", mouseout);
 
-      rects.exit().attr("width", 0);
+      rects.exit().style("display", "none");
 
-
-      var stroke = 0.25;
+      var stroke = 0.05;
       if (maxY - minY > 250) {
         stroke = 0;
+      }
+
+      fontSize = filteredData[0].scaledH * 0.5;
+      if (fontSize > 12) {
+        fontSize = 12;
       }
 
       rects
@@ -986,15 +1023,33 @@ var data = /**DATA**/;
         .attr("frameId", function(d) { return d.id } )
         .attr("gem", function(d) { return d.gemName } )
         .attr("method", function(d) { return d.methodName } )
-        .attr("x",function(d) { return d.scaledX; })
-        .attr("y",function(d) { return d.scaledY; })
-        .attr("width", function(d){ return d.displayW; })
-        .attr("height", function(d){ return d.scaledH; })
-        .attr("fill", function(d){ return d.fill; })
-        .attr("opacity", function(d){ return d.opacityFactor; })
-        .attr("cursor", "pointer")
-        .attr("stroke", "black")
-        .attr("stroke-width", stroke);
+        .style("display", "block")
+        .style("position", "absolute")
+        .style("right",function(d) { return d.scaledX + "px"; })
+        .style("top",function(d) { return d.scaledY + "px"; })
+        .style("width", function(d){ return d.displayW + "px"; })
+        .style("height", function(d){ return d.scaledH + "px"; })
+        .style("background-color", function(d){ return d.fill; })
+        .style("color", function(d){ return d.textColor; })
+        .style("opacity", function(d){ return d.opacityFactor; })
+        .style("font-size", fontSize + "px")
+        .style("cursor", "pointer")
+        .style("border-top", stroke + "px solid black")
+        .style("border-right", stroke + "px solid black")
+        .style("border-left", stroke + "px solid black")
+        .html(function(d) { return $("<span>").text(d.shortMethodName).get(0).outerHTML; });
+
+      if (fontSize > 7) {
+        $.each(filteredData, function() {
+          var node = this.node;
+
+          if (node.scrollWidth > node.offsetWidth && this.displayW < 40) {
+            $(node).find("span").hide();
+          }
+        });
+      } else {
+        $("div.frame span").hide();
+      }
 
       setTimeout(function() {
         renderLegend("gem");
@@ -1108,10 +1163,6 @@ var data = /**DATA**/;
       byType = type;
       processData(data);
       drawData(data);
-      svg.selectAll("rect")
-        .transition()
-        .attr("fill", function(d){ return d.fill; })
-        .attr("opacity", function(d){ return d.opacityFactor; });
 
       $("[data-action=color]").css({color: "black"});
       $("[data-type=" + byType + "][data-action=color]").css({color: "red"});
@@ -1241,7 +1292,7 @@ var data = /**DATA**/;
           if (!currentElement) return;
 
           var blink = "true";
-          var matcher = "rect[" + type + "='" + currentElement + "']";
+          var matcher = "div.frame[" + type + "='" + currentElement + "']";
 
           if ($(matcher + "[data-blink=true]").length) {
             blink = "";
@@ -1310,7 +1361,7 @@ var data = /**DATA**/;
       keyboardJS.bind("a", function(e) {
         if (!currentFrame) return;
         var blink = "true";
-        var matcher = "rect[method='" + currentFrame.methodName + "']";
+        var matcher = "div.frame[method='" + currentFrame.methodName + "']";
 
         if ($(matcher + "[data-blink=true]").length) {
           blink = "";
