@@ -9,7 +9,6 @@
   <style>
     .graph {
       position: relative;
-      border-bottom: 1px solid black;
     }
 
     [data-blink=true] {
@@ -54,6 +53,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
 
+      box-sizing: content-box;
+      -moz-box-sizing: content-box;
+      -webkit-box-sizing: content-box;
     }
 
     .frame span {
@@ -1010,8 +1012,8 @@ var data = /**DATA**/;
 
       rects.exit().style("display", "none");
 
-      var stroke = 0.05;
-      if (maxY - minY > 200) {
+      var stroke = 1;
+      if (maxY - minY > 100) {
         stroke = 0;
       }
 
@@ -1029,16 +1031,14 @@ var data = /**DATA**/;
         .style("position", "absolute")
         .style("right",function(d) { return d.scaledX + "px"; })
         .style("top",function(d) { return d.scaledY + "px"; })
-        .style("width", function(d){ return d.displayW + "px"; })
-        .style("height", function(d){ return d.scaledH + "px"; })
+        .style("width", function(d){ return (d.displayW - stroke) + "px"; })
+        .style("height", function(d){ return (d.scaledH - stroke) + "px"; })
         .style("background-color", function(d){ return d.fill; })
         .style("color", function(d){ return d.textColor; })
         .style("opacity", function(d){ return d.opacityFactor; })
         .style("font-size", fontSize + "px")
         .style("cursor", "pointer")
-        .style("border-top", stroke + "px solid black")
-        .style("border-right", stroke + "px solid black")
-        .style("border-left", stroke + "px solid black")
+        .style("border", stroke + "px solid black")
         .html(function(d) { return $("<span>").text(d.shortMethodName).get(0).outerHTML; });
 
       if (fontSize > 7) {
