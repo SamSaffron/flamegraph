@@ -116,6 +116,7 @@
       </div>
       <div class="content">
         <h5>Anywhere</h5>
+        <p><code>?</code> - show this modal</p>
         <p><code>0</code> - reset zoom</p>
         <p><code>-</code> - zoom out one level</p>
         <p><code>+</code> - previous zoom</p>
@@ -174,7 +175,8 @@
       </script>
       <div class="four wide column">
         <div class="ui segment">
-          <button class="ui disabled button" data-action="resetZoom">No Zoom</button>
+          <button class="ui button" data-action="help">Help</button>
+          <button class="ui disabled right floated button" data-action="resetZoom">No Zoom</button>
           <div class="ui clearing divider hidden"></div>
           <div id="includedFilters" class="">
           </div>
@@ -1176,6 +1178,11 @@ var data = /**DATA**/;
 
     $("button[data-action=resetZoom]").on("click", function() {
       resetZoom();
+      return false;
+    });
+
+    $("button[data-action=help]").on("click", function() {
+      $("#keyboard-modal").modal('show');
       return false;
     });
 
