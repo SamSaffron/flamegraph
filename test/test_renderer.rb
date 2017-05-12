@@ -17,6 +17,21 @@ class TestRenderer < Minitest::Test
 
   end
 
+  def test_builds_table_correctly_for_different_grandparents
+    stacks = [["method4","method3","method1"],["method4","method3","method1"],["method4","method3","method2"]]
+
+    g = Flamegraph::Renderer.new(stacks)
+    assert_equal([
+        {:x => 1, :y => 1, :frame => "method1", :width => 2},
+        {:x => 1, :y => 2, :frame => "method3", :width => 2},
+        {:x => 1, :y => 3, :frame => "method4", :width => 2},
+        {:x => 3, :y => 1, :frame => "method2", :width => 1},
+        {:x => 3, :y => 2, :frame => "method3", :width => 1},
+        {:x => 3, :y => 3, :frame => "method4", :width => 1}
+    ], g.graph_data)
+
+  end
+
   def test_avoids_bridges
     stacks = [["3","2","1"],["4","1"],["4","5"]]
 
