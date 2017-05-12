@@ -783,38 +783,6 @@ var data = /**DATA**/;
             x--;
           }
 
-          var dEndPoint = d.oX + d.oWidth;
-          var parentEndPoint = d.parent.oX + d.parent.oWidth;
-          if (parentEndPoint < dEndPoint) {
-            var new_element = jQuery.extend({}, d);
-            new_element.children = [];
-            new_element.parent = null;
-            new_element.samples = null;
-            
-            var oldWidth = d.oWidth;
-            d.oWidth = d.width = parentEndPoint - d.oX;
-            new_element.oWidth = new_element.width = oldWidth - d.oWidth;
-            
-            new_element.oX = new_element.x = parentEndPoint;
-            
-            setSamples(d);
-            setSamples(new_element);
-            
-            var z = i;
-            while(z < data.length - 1) {
-              if (data[z].oY == d.oY - 1) {
-                break;
-              }
-            
-              z++;
-            }
-            
-            new_element.id = z + 1;
-            
-            data.splice(z + 1, 0, new_element);
-            length = data.length;
-          }
-
           if (d.parent) {
             break;
           }
@@ -824,11 +792,6 @@ var data = /**DATA**/;
 
           depth--;
         }
-      }
-
-      for(var i=0; i < data.length; i++) {
-        var d = data[i];
-        d.id = i;
       }
     }
 
