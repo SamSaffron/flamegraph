@@ -10,8 +10,9 @@ class TestRenderer < Minitest::Test
         {:x => 1, :y => 1, :frame => "1", :width => 2},
         {:x => 1, :y => 2, :frame => "2", :width => 1},
         {:x => 1, :y => 3, :frame => "3", :width => 1},
-        {:x => 2, :y => 2, :frame => "4", :width => 2},
-        {:x => 3, :y => 1, :frame => "5", :width => 1}
+        {:x => 2, :y => 2, :frame => "4", :width => 1},
+        {:x => 3, :y => 1, :frame => "5", :width => 1},
+        {:x => 3, :y => 2, :frame => "4", :width => 1}
     ], g.graph_data)
 
   end
@@ -25,8 +26,9 @@ class TestRenderer < Minitest::Test
         {:x => 1, :y => 1, :frame => "1", :width => 2},
         {:x => 1, :y => 2, :frame => "2", :width => 1},
         {:x => 1, :y => 3, :frame => "3", :width => 1},
-        {:x => 2, :y => 2, :frame => "4", :width => 2},
-        {:x => 3, :y => 1, :frame => "5", :width => 1}
+        {:x => 2, :y => 2, :frame => "4", :width => 1},
+        {:x => 3, :y => 1, :frame => "5", :width => 1},
+        {:x => 3, :y => 2, :frame => "4", :width => 1}
     ], g.graph_data)
 
 
