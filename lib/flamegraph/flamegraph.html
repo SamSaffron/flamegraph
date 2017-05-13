@@ -276,7 +276,9 @@
   </div>
   <script>
 
-var data = /**DATA**/;
+    var graph_data = /**DATA**/;
+    var data = graph_data.data;
+    var frames = graph_data.frames;
 
     var maxX = 0;
     var maxY = 0;
@@ -353,17 +355,18 @@ var data = /**DATA**/;
         d.oX = d.oX || d.x;
         d.oY = d.oY || d.y;
 
-        if (parsedNames[d.frame]) {
-          d.methodName = parsedNames[d.frame].methodName;
-          d.shortMethodName = parsedNames[d.frame].shortMethodName;
-          d.gemName = parsedNames[d.frame].gemName;
-          d.fileName = parsedNames[d.frame].fileName;
+        frame = frames[d.frame_id]
+        if (parsedNames[frame]) {
+          d.methodName = parsedNames[frame].methodName;
+          d.shortMethodName = parsedNames[frame].shortMethodName;
+          d.gemName = parsedNames[frame].gemName;
+          d.fileName = parsedNames[frame].fileName;
         } else {
-          parsedNames[d.frame] = {};
-          parsedNames[d.frame].methodName = d.methodName = guessFullMethod(d.frame);
-          parsedNames[d.frame].shortMethodName = d.shortMethodName = guessShortMethod(d.methodName);
-          parsedNames[d.frame].gemName = d.gemName = guessGem(d.frame);
-          parsedNames[d.frame].fileName = d.fileName = guessFile(d.frame);
+          parsedNames[frame] = {};
+          parsedNames[frame].methodName = d.methodName = guessFullMethod(frame);
+          parsedNames[frame].shortMethodName = d.shortMethodName = guessShortMethod(d.methodName);
+          parsedNames[frame].gemName = d.gemName = guessGem(frame);
+          parsedNames[frame].fileName = d.fileName = guessFile(frame);
         }
 
         d.opacityFactor = 1;
@@ -424,7 +427,8 @@ var data = /**DATA**/;
     };
 
     var frameStats = function(d) {
-      var i = info[byType][d.frame];
+      frame = frames[d.frame_id]
+      var i = info[byType][frame];
 
       inSet = dataStats["method"][d.methodName];
 
@@ -433,7 +437,7 @@ var data = /**DATA**/;
         childrenSize = childrenSize + this.samplesLength;
       });
 
-      d.filePath = d.filePath || guessFilePath(d.frame);
+      d.filePath = d.filePath || guessFilePath(frame);
 
       var stat = {
         id: d.id,
@@ -441,7 +445,7 @@ var data = /**DATA**/;
         shortName: d.shortMethodName,
         gemName: d.gemName,
         filePath: d.filePath,
-        frame: d.frame,
+        frame: frame,
         samples: d.samplesLength,
         selfSamples: d.samplesLength - childrenSize,
         ofZoom: inSet ? "no zoom" : "beyond zoom",
@@ -489,7 +493,8 @@ var data = /**DATA**/;
       keyboardJS.setContext("");
       currentFrame = null;
 
-      var i = info[byType][d.frame];
+      var frame = frames[d.frame_id];
+      var i = info[byType][frame];
       $('.ui.footer').hide().children().remove();
       d3.selectAll("div.frame[method='" + d.methodName + "']")
         .style('background-color', function(d) { return d.fill; })
@@ -521,7 +526,7 @@ var data = /**DATA**/;
     };
 
     var backtrace = function(frame){
-      frames = [frame];
+      var frames = [frame];
 
       var parent = filteredParent(frame)
       while (parent) {
@@ -685,8 +690,9 @@ var data = /**DATA**/;
         }
 
 
+        var frame = frames[this.frame_id];
         stat.count = stat.count + 1;
-        stat.frames.push(this.frame);
+        stat.frames.push(frame);
         stat.data.push(this);
         for(var j=0; j < this.width; j++){
           stat.samples[this.x + j] = 1;
@@ -825,7 +831,8 @@ var data = /**DATA**/;
       for(var i=0; i < data.length; i++) {
         var d = data[i];
 
-        var info_frame = info[type][d.frame];
+        var frame = frames[d.frame_id];
+        var info_frame = info[type][frame];
         for(var j=0; j < d.width; j++){
           info_frame.samples[d.x + j] = 1;
         }
@@ -847,7 +854,8 @@ var data = /**DATA**/;
         d.displayW = d.scaledW = xScale(d.width);
         d.scaledH = yScale(1);
 
-        var info_frame = info[byType][d.frame];
+        var frame = frames[d.frame_id];
+        var info_frame = info[byType][frame];
         d.fill = info_frame.color;
 
         var color = tinycolor(d.fill);
@@ -876,14 +884,15 @@ var data = /**DATA**/;
           var shouldInclude = false;
           var shouldExclude = true;
 
+          var frame = frames[d.frame_id];
           if (includedFilters.length > 0) {
-            shouldInclude = includedFilters.some(function(v) { return d.frame.indexOf(v) >= 0; })
+            shouldInclude = includedFilters.some(function(v) { return frame.indexOf(v) >= 0; })
           } else {
             shouldInclude = true;
           }
 
           if (excludedFilters.length > 0) {
-            shouldExclude = excludedFilters.some(function(v) { return d.frame.indexOf(v) >= 0; });
+            shouldExclude = excludedFilters.some(function(v) { return frame.indexOf(v) >= 0; });
           } else {
             shouldExclude = false;
           }

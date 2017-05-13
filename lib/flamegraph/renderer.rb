@@ -41,6 +41,9 @@ class Flamegraph::Renderer
         prev = []
         prev_parent = []
 
+        frames = []
+        frames_index = {}
+
         # a 2d array makes collapsing easy
         @stacks.each_with_index do |stack, pos|
 
@@ -81,16 +84,27 @@ class Flamegraph::Renderer
         table.each_with_index do |col, col_num|
           col.each_with_index do |row, row_num|
             next unless row && row.length == 2
+
+            frame = row[0]
+            frame_id = frames_index[frame]
+            if !frame_id
+              frames << frame
+              frame_id = frames_index[frame] = frames.size - 1
+            end
+
             data << {
               :x => col_num + 1,
               :y => row_num + 1,
               :width => row[1],
-              :frame => row[0]
+              :frame_id => frame_id
             }
           end
         end
 
-        data
+        {
+          data: data,
+          frames: frames
+        }
       end
   end
 
