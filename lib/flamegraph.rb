@@ -45,7 +45,7 @@ module Flamegraph
         end
       end
     if opts[:hide_x_bottom_lines]
-      backtraces.map! { |b| b[0..-(opts[:hide_bottom_lines].to_i + 1)] }.reject(&:empty?)
+      backtraces.map! { |b| b[0..-(opts[:hide_x_bottom_lines].to_i + 1)] }.reject(&:empty?)
     end
     if opts[:sort_alphabetically]
       backtraces.sort_by! {|b| b.reverse.join('---')}
