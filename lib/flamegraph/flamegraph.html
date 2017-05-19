@@ -52,10 +52,7 @@
     .frame {
       overflow: hidden;
       text-overflow: ellipsis;
-
-      box-sizing: content-box;
-      -moz-box-sizing: content-box;
-      -webkit-box-sizing: content-box;
+      padding-left: 2px;
     }
 
     .frame span {
@@ -375,11 +372,7 @@
     }
 
     var setSamples = function(d) {
-      d.samples = {};
-      for(var j=0; j < d.oWidth; j++){
-        d.samples[d.oX + j] = 1;
-      }
-      d.samplesLength = j;
+      d.samplesLength = d.oWidth;
     }
 
     $.each(data, function(){
@@ -450,9 +443,9 @@
         selfSamples: d.samplesLength - childrenSize,
         ofZoom: inSet ? "no zoom" : "beyond zoom",
         ofParent: "No Parent ",
-        ofTotal: ((d.samplesLength / oMaxX) * 100).toFixed(2),
+        ofTotal: ((d.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
         totalSamples: i.samplesLength,
-        allOfTotal: ((i.samplesLength / oMaxX) * 100).toFixed(2),
+        allOfTotal: ((i.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
         calls: inSet ? dataStats["method"][d.methodName].count : "beyond zoom"
       };
 
@@ -589,12 +582,22 @@
       currentZoom = d;
 
       resetData();
+      var setZoom = function(child) {
+        child.zoomed = true;
+        child.x = child.x - d.oX + 1;
+      }
 
       if (currentZoom) {
-        $.each([d].concat(d.allChildren), function() { 
-          this.zoomed = true; 
-          this.x = this.x - d.oX + 1;
-        });
+        if (!d.allChildren) {
+          setZoom(d);
+          determineFilteredChildren(d, function(child) {
+            setZoom(child);
+          });
+        } else {
+          $.each([d].concat(d.allChildren), function() {
+            setZoom(this);
+          });
+        }
         $("[data-action=resetZoom]").removeClass("disabled").text("Reset Zoom");
       } else {
         $("[data-action=resetZoom]").addClass("disabled").text("No Zoom");
@@ -721,6 +724,7 @@
 
         for(var x=0; x < stat.frames.length; x++) {
           info[type][stat.frames[x]] = info[type][stat.frames[x]] || {samplesLength: 0, samples: {}, color: stat.color};
+          info[type][stat.frames[x]].color = info[type][stat.frames[x]].color || stat.color;
         }
 
         currentIndex += 1;
@@ -737,11 +741,29 @@
       return filteredChildren(d).filter(function(c) { return c.y == d.y + 1 });
     };
 
+    var determineFilteredChildren = function(d, fn) {
+      for (var i = 0; i < d.filteredChildren.length; i++) {
+        var child = d.filteredChildren[i];
+        determineFilteredChildren(child, fn);
+        fn(child);
+      }
+    }
+
     var filteredChildren = function(d) {
       return d.allChildren.filter(filteredDataFilter);
     };
 
     var filteredParent = function(d) {
+      if (!d.allParents) {
+        var parent = d.parent;
+        while (parent) {
+          if (filteredDataFilter(parent)) {
+            return parent;
+          }
+          parent = parent.parent;
+        }
+        return;
+      }
       return d.allParents.filter(filteredDataFilter)[0];
     };
 
@@ -757,47 +779,33 @@
 
         d.parent = null;
         d.children = [];
-        d.allParents = [];
+        d.allParents = null;
+        d.allChildren = null;
 
         if (d.oY == 1) {
           continue;
         }
 
-        while(depth >= 0) {
-          var x = i;
-          while(x >= 0){
-            data[x].children = data[x].children || [];
+        var x = i;
+        while(x >= 0){
+          data[x].children = data[x].children || [];
 
-            if (
-                data[x].oY === depth - 1  
-               // && 
-             //   data[x].oX <= d.oX && 
-              //   data[x].oX + data[x].oWidth >= d.oX + d.oWidth
-               ) {
-              d.parent = data[x];
-              var parent = d.parent;
-              while (parent) {
-                d.allParents.push(parent);
-                parent.allChildren = parent.allChildren || [];
-                parent.allChildren.push(d);
-                parent = parent.parent;
-              }
-              data[x].children.push(d);
-              break;
-            }
-
-            x--;
-          }
-
-          if (d.parent) {
+          if ( data[x].oY === depth - 1 ) {
+            d.parent = data[x];
+            var parent = d.parent;
+          //while (parent) {
+          //  d.allParents.push(parent);
+          //  parent.allChildren = parent.allChildren || [];
+          //  parent.allChildren.push(d);
+          //  parent = parent.parent;
+          //}
+            data[x].children.push(d);
             break;
           }
 
-          // for debugging bad nodes
-          d.odd_parent = true;
-
-          depth--;
+          x--;
         }
+
       }
     }
 
@@ -811,14 +819,12 @@
       return maxX;
     }
 
-    function setMaxY(data, zoomedAndFiltered) {
+    function setMaxY(data, visibleData) {
       maxY = -1;
       minY = Infinity;
 
-      var filteredData = zoomedAndFiltered.filter(function(d) { return xScale(d.width) > displayWidth });
-
-      maxY = d3.max(filteredData, function(d) { return d.y; });
-      minY = d3.min(filteredData, function(d) { return d.y; });
+      maxY = d3.max(visibleData, function(d) { return d.y; });
+      minY = d3.min(visibleData, function(d) { return d.y; });
 
       yScale = d3.scale.linear()
         .domain([0, maxY - minY + 1])
@@ -832,11 +838,9 @@
         var d = data[i];
 
         var frame = frames[d.frame_id];
+        info[type][frame] = info[type][frame] || {samplesLength: 0, samples: {}, color: null};
         var info_frame = info[type][frame];
-        for(var j=0; j < d.width; j++){
-          info_frame.samples[d.x + j] = 1;
-        }
-        info_frame.samplesLength = info_frame.samplesLength + j;
+        info_frame.samplesLength = info_frame.samplesLength + d.width;
       }
     }
 
@@ -844,24 +848,56 @@
       zoomedAndFiltered = zoomedAndFilteredData(data);
 
       setMaxX(data, zoomedAndFiltered);
-      setMaxY(data, zoomedAndFiltered);
 
-      for(var i=0; i < data.length; i++) {
-        var d = data[i];
+      var invertedDisplayWidth = xScale.invert(displayWidth);
+      visibleData = zoomedAndFiltered.filter(function(d) {
+        return d.width > invertedDisplayWidth;
+      });
 
-        d.scaledX = xScale(d.x-1);
-        d.scaledY = yScale(maxY - d.y);
-        d.displayW = d.scaledW = xScale(d.width);
-        d.scaledH = yScale(1);
+      setMaxY(data, visibleData);
+
+      var xHash = {};
+      var yHash = {};
+      var wHash = {};
+
+      var scaledH = yScale(1);
+
+
+      for(var i=0; i < visibleData.length; i++) {
+        var d = visibleData[i];
+
+        xHash[d.x] = xHash[d.x] || xScale(d.x - 1);
+        d.scaledX = xHash[d.x];
+
+        yHash[d.y] = yHash[d.y] || yScale(maxY - d.y);
+        d.scaledY = yHash[d.y];
+
+        wHash[d.width] = wHash[d.width] || xScale(d.width);
+        d.displayW = d.scaledW = wHash[d.width];
+
+        d.scaledH = scaledH;
 
         var frame = frames[d.frame_id];
         var info_frame = info[byType][frame];
-        d.fill = info_frame.color;
-
-        var color = tinycolor(d.fill);
-        d.textColor = (color.isLight()) ? "black" : "lightyellow";
-
+        d.fill = colors[byType][d[byType + "Name"]];
       }
+    }
+
+    var textColors = {};
+    function textColorForFill(d) {
+      if (!d.fill) {
+        return null;
+      }
+
+      textColors = textColors || {};
+      if (textColors[d.fill]) {
+        return textColors[d.fill];
+      }
+
+      var color = tinycolor(d.fill);
+      textColors[d.fill] = (color.isLight()) ? "black" : "lightyellow";
+
+      return textColors[d.fill];
     }
 
     function resetFilter() {
@@ -869,7 +905,7 @@
         var d = data[i];
         d.filteredIn = null;
         d.filteredOut = null;
-        d.filteredChildren = null;
+        d.filteredChildren = d.children;
         d.filteredParent = d.parent;
       }
     };
@@ -880,6 +916,7 @@
       if (includedFilters.length > 0 || excludedFilters.length > 0) {
         for(var i=0; i < data.length; i++) {
           var d = data[i];
+          d.filteredChildren = [];
 
           var shouldInclude = false;
           var shouldExclude = true;
@@ -905,6 +942,8 @@
             if (d.filteredParent) {
               d.filteredParent.filteredChildren.push(d);
               d.y = d.filteredParent.y + 1;
+            } else {
+              d.y = 1;
             }
           } else {
             d.filteredOut = true;
@@ -945,14 +984,10 @@
         return d.displayW > displayWidth;
       }
 
-      var filteredData = zoomedAndFilteredData(data);
+      analyzeData(zoomedAndFiltered, "method");
+      analyzeData(zoomedAndFiltered, "gem");
 
-      if (!options.enter) {
-        analyzeData(filteredData, "method");
-        analyzeData(filteredData, "gem");
-      }
-
-      filteredData = filteredData.filter(display_width_filter);
+      var filteredData = visibleData;
 
       var rects = graph.selectAll("div")
         .data(filteredData);
@@ -988,37 +1023,43 @@
         .style("top",function(d) { return d.scaledY + "px"; })
         .style("width", function(d){ return (d.displayW - stroke) + "px"; })
         .style("height", function(d){ return (d.scaledH - stroke) + "px"; })
-        .style("background-color", function(d){ return d.fill; })
-        .style("color", function(d){ return d.textColor; })
+        .style("background-color", function(d){ 
+          d.fill = d.fill || colors[byType][d[byType + "Name"]];
+          return d.fill; 
+        })
+        .style("color", function(d){ 
+          return textColorForFill(d);
+        })
         .style("opacity", function(d){ return d.opacityFactor; })
         .style("font-size", fontSize + "px")
         .style("cursor", "pointer")
-        .style("border", stroke + "px solid black")
-        .html(function(d) { return $("<span>").text(d.shortMethodName).get(0).outerHTML; });
-
-      if (fontSize > 7) {
-        $.each(filteredData, function() {
-          var node = this.node;
-
-          if (node.scrollWidth > node.offsetWidth && this.displayW < 40) {
-            $(node).find("span").hide();
+        .text(function(d) { 
+          var text = d.shortMethodName;
+          if (d.displayW < 40) {
+            text = "";
           }
+          return text;
         });
-      } else {
-        $("div.frame span").hide();
-      }
 
-      setTimeout(function() {
+      setTimeout(function(rects) {
         renderLegend("gem");
         renderLegend("method");
-      }, 10);
+      }, 10, rects);
     }
 
+    function htmlEscape(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
 
 
     function renderLegend(type) {
       // render the legend
-      var maxPoint = oMaxX;
+      var maxPoint = oMaxX - 1;
 
       if (currentZoom) {
         maxPoint = currentZoom.samplesLength;
@@ -1110,10 +1151,7 @@
     storeOriginals(data);
     setRelations(data);
 
-    analyzeData(data, "method");
     processFrameInfo(data, "method");
-
-    analyzeData(data, "gem");
     processFrameInfo(data, "gem");
 
     displayFilters({enter: true});
@@ -1130,8 +1168,6 @@
     $("[data-action=color]").on("click", function() {
       colorFrames($(this).data("type"));
     });
-
-    colorFrames(byType);
 
     $("button[data-action=resetZoom]").on("click", function() {
       resetZoom();
