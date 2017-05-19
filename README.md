@@ -39,6 +39,22 @@ end
 
 ```
 
+You can also pass some options:
+
+```ruby
+
+# will hide bottom x lines of the graph
+Flamegraph.generate(filename, hide_x_bottom_lines: 20) do
+  # your work here
+end
+
+# will order stacktraces alphabetically, like the original Flamegraph (https://github.com/brendangregg/FlameGraph) does
+Flamegraph.generate(filename, sort_alphabetically: true) do
+  # your work here
+end
+
+```
+
 ## Demo
 
 Demo of: https://github.com/SamSaffron/flamegraph/blob/master/demo/demo.rb

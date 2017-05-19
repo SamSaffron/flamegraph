@@ -44,6 +44,12 @@ module Flamegraph
           yield
         end
       end
+    if opts[:hide_x_bottom_lines]
+      backtraces.map! { |b| b[0..-(opts[:hide_bottom_lines].to_i + 1)] }.reject(&:empty?)
+    end
+    if opts[:sort_alphabetically]
+      backtraces.sort_by! {|b| b.reverse.join('---')}
+    end
 
     embed_resources = (filename && !opts.key?(:embed_resources)) || opts[:embed_resources]
 
