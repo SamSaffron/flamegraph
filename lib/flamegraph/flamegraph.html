@@ -252,7 +252,7 @@
           </tbody>
           <script id="method-row-template" type="text/x-handlebars-template">
             <tr style="background-color: {{color}}; color: {{textColor}}" >
-              <td> {{name}} </td>
+              <td> {{displayName}} </td>
 
               <td class="right aligned"> {{selfSamples}} </td>
               <td class="right aligned"> {{ofSelfTotal}}% </td>
@@ -423,7 +423,7 @@
       frame = frames[d.frame_id]
       var i = info[byType][frame];
 
-      inSet = dataStats["method"][d.methodName];
+      inSet = dataStats["method"][d.frame_id];
 
       var childrenSize = 0;
       $.each(d.filteredChildren || [], function() {
@@ -446,7 +446,7 @@
         ofTotal: ((d.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
         totalSamples: i.samplesLength,
         allOfTotal: ((i.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
-        calls: inSet ? dataStats["method"][d.methodName].count : "beyond zoom"
+        calls: inSet ? dataStats["method"][d.frame_id].count : "beyond zoom"
       };
 
       if (d.filteredParent) {
@@ -476,7 +476,7 @@
       var stat = frameStats(d);
 
       $('.ui.footer').html(template("info-table-template")({stats: [stat]})).show();
-      d3.selectAll("div.frame[method='" + d.methodName + "']")
+      d3.selectAll("div.frame[frameId='" + d.frame_id + "']")
         .style('background-color', "black")
         .style('color', "white")
         .style('opacity', 0.5);
@@ -489,7 +489,7 @@
       var frame = frames[d.frame_id];
       var i = info[byType][frame];
       $('.ui.footer').hide().children().remove();
-      d3.selectAll("div.frame[method='" + d.methodName + "']")
+      d3.selectAll("div.frame[frameId='" + d.frame_id + "']")
         .style('background-color', function(d) { return d.fill; })
         .style('color', function(d) { return d.textColor; })
         .style('opacity', function(f) { return f.opacityFactor });
@@ -498,8 +498,12 @@
     var selectElement = function(e) {
       keyboardJS.setContext(e.data.type);
       var name = e.data.name;
+      var type = e.data.type;
+      if (type == "method") {
+        type = "frameId"
+      }
       currentElement = name;
-      d3.selectAll("div.frame[" + e.data.type +"='" + name + "']")
+      d3.selectAll("div.frame[" + type +"='" + name + "']")
         .style('background-color', "black")
         .style('color', "white")
         .style('opacity', 0.5);
@@ -510,7 +514,11 @@
       keyboardJS.setContext('');
       currentElement = null;
       var name = e.data.name;
-      d3.selectAll("div.frame[" + e.data.type + "='" + name + "']")
+      var type = e.data.type;
+      if (type == "method") {
+        type = "frameId"
+      }
+      d3.selectAll("div.frame[" + type + "='" + name + "']")
         .attr('data-blink', "")
         .style('background-color', function(d) { return d.fill; })
         .style('color', function(d) { return d.textColor; })
@@ -677,6 +685,11 @@
       method: {}
     };
 
+    var typeKey = function(type) {
+      if (type == "method") return "frame_id";
+      return "gemName";
+    }
+
     function analyzeData(data, type) {
       type = type || byType;
 
@@ -685,11 +698,14 @@
 
       // assign some colors, analyze samples per type
       $.each(data, function(){
-        var group = this[type + "Name"];
+        var group = this[typeKey(type)];
         var stat = dataStats[type][group];
 
         if(!stat) {
-          dataStats[type][group] = stat = {count: 0, name: group, samplesLength: 0, samples: {}, frames: [], data: []};
+          dataStats[type][group] = stat = {count: 0, displayName: group, name: group, samplesLength: 0, samples: {}, frames: [], data: []};
+          if (type == "method") {
+            dataStats[type][group].displayName = this.methodName;
+          }
         }
 
 
@@ -879,7 +895,7 @@
 
         var frame = frames[d.frame_id];
         var info_frame = info[byType][frame];
-        d.fill = colors[byType][d[byType + "Name"]];
+        d.fill = colors[byType][d[typeKey(byType)]];
       }
     }
 
@@ -1014,7 +1030,8 @@
 
       rects
         .each(function(d) { d.node = this; } )
-        .attr("frameId", function(d) { return d.id } )
+        .attr("nodeId", function(d) { return d.id } )
+        .attr("frameId", function(d) { return d.frame_id } )
         .attr("gem", function(d) { return d.gemName } )
         .attr("method", function(d) { return d.methodName } )
         .style("display", "block")
@@ -1024,7 +1041,7 @@
         .style("width", function(d){ return (d.displayW - stroke) + "px"; })
         .style("height", function(d){ return (d.scaledH - stroke) + "px"; })
         .style("background-color", function(d){ 
-          d.fill = d.fill || colors[byType][d[byType + "Name"]];
+          d.fill = d.fill || colors[byType][d[typeKey(byType)]];
           return d.fill; 
         })
         .style("color", function(d){ 
@@ -1067,7 +1084,6 @@
 
       $.each(dataSorted[type], function() {
         this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
-        this.shortName = guessShortMethod(this.name);
         var sampleSize = 0;
         var childrenSize = 0;
         $.each(this.data || [], function() {
@@ -1292,7 +1308,11 @@
           if (!currentElement) return;
 
           var blink = "true";
-          var matcher = "div.frame[" + type + "='" + currentElement + "']";
+          var key = type;
+          if (key == "method") {
+            key = "frameId";
+          }
+          var matcher = "div.frame[" + key + "='" + currentElement + "']";
 
           if ($(matcher + "[data-blink=true]").length) {
             blink = "";
