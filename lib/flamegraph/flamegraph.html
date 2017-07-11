@@ -1,530 +1,1414 @@
 <!DOCTYPE html>
 <html>
 <head>
-/**INCLUDES**/
+  /**INCLUDES**/
 
-<meta charset=utf-8 />
+  <meta charset=utf-8 />
 
-<title>Flame Graph of Page</title>
-<style>
-  .info {min-height: 50px; margin: 10px; }
-  .legend div {
-    display: block;
-    float: left;
-    width: 150px;
-    margin: 0 8px 8px;
-    padding: 4px;
-    height: 50px;
-  }
-  .code {
-    font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
-  }
-  #frameinfo table .sample-info {
-    width: 200px;
-    color: #333;
-    font-size: 12px;
-  }
-  #frameinfo table {
-    border-collapse: collapse;
-  }
-  #frameinfo table tr {
-    border-bottom: 1px solid #eee;
-    margin-top: 5px;
-  }
-  #frameinfo td {
-    padding: 5px;
-  }
-  #frameinfo-wrapper {
-    position: fixed;
-    z-index: 1;
-    opacity: 0.7;
-    background-color: black;
-    width: 100%;
-    height: 100%;
-    top: 0;
-    left: 0;
-    display: none;
-  }
-  #frameinfo {
-    position: fixed;
-    padding: 10px;
-    z-index: 2;
-    opacity: 1.0;
-    top: 0;
-    margin-top: 50px;
-    margin-left: 40px;
-    width: 80%;
-    height: 80%;
-    background-color: white;
-    border: 2px solid #666;
-    display: none;
-    overflow: auto;
-  }
-</style>
+  <title>Flame Graph of Page</title>
+  <style>
+    .graph {
+      position: relative;
+    }
+
+    [data-blink=true] {
+      animation: blink-animation 0.75s steps(5, start) infinite;
+      -webkit-animation: blink-animation 0.75s steps(5, start) infinite;
+    }
+    @keyframes blink-animation {
+      to {
+        visibility: hidden;
+      }
+    }
+    @-webkit-keyframes blink-animation {
+      to {
+        visibility: hidden;
+      }
+    }
+
+    .code {
+      font-family: Consolas, Menlo, Monaco, "Lucida Console", "Liberation Mono", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Courier New", monospace;
+    }
+
+    .content {
+      width: 100%;
+    }
+
+    .ui.footer.segment {
+      padding: 0;
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      margin-bottom: 0;
+      background-color: #f5f5f5;
+    }
+
+    #keyboard-modal code {
+      border-radius: 3px;
+      background-color: rgba(0, 0, 0, 0.06);
+      padding: 3px 4px;
+    }
+
+    .frame {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-left: 2px;
+    }
+
+    .frame span {
+      position: absolute;
+      bottom: 0px;
+      left: 3px;
+    }
+  </style>
 </head>
 <body>
-  <div class="graph"></div>
-  <div class="info code"></div>
-  <div class="legend"></div>
-  <div id="frameinfo-wrapper"></div>
-  <div id="frameinfo">
-    <h3>Frame Info</h3>
-    <table>
+  <script id="info-table-template" type="text/x-handlebars-template">
+    <table class="ui compact small table" style="word-break: break-all;">
+      <thead>
+      <tr>
+        <th> ID </td>
+        <th> Method </td>
+        <th> Gem </td>
+        <th> Self </td>
+        <th> Samples </td>
+        <th> of Parent </td>
+        <th> of Zoom </td>
+        <th> of Total </td>
+
+        <th> # Calls </td>
+        <th> All Samples </td>
+        <th> of Total </td>
+      </tr>
+      </thead>
+      <tbody>
+      {{#each stats}}
+        <tr>
+          <td class="one wide"> <i data-id="{{id}}" class="search icon"></i> {{id}} </td>
+          <td class="four wide"> <b>{{name}}</b> </td>
+          <td class="two wide"> {{gemName}} </td>
+          <td > {{selfSamples}} </td>
+          <td > {{samples}} </td>
+          <td > {{ofParent}}% </td>
+          <td > {{ofZoom}}% </td>
+          <td > {{ofTotal}}% </td>
+
+          <td > {{calls}} </td>
+          <td > {{totalSamples}} </td>
+          <td > {{allOfTotal}}% </td>
+        </tr>
+        <tr>
+          <td colspan="11"> <i class="copy icon" data-clipboard-text="{{filePath}}"></i> {{frame}} </td>
+        </tr>
+      {{/each}}
+      </tbody>
     </table>
+  </script>
+
+  <div id="main" class="ui fluid container" style="padding: 7px;">
+    <div class="graph" oncontextmenu="return false;"></div>
+
+    <div id="keyboard-modal" class="ui modal" >
+      <i class="close icon"></i>
+      <div class="header">
+        Keyboard Commands
+      </div>
+      <div class="content">
+        <h5>Anywhere</h5>
+        <p><code>?</code> - show this modal</p>
+        <p><code>0</code> - reset zoom</p>
+        <p><code>-</code> - zoom out one level</p>
+        <p><code>+</code> - previous zoom</p>
+        <p><code>g</code> <code>c</code> - color by gem</p>
+        <p><code>g</code> <code>m</code> - color by method</p>
+        <p><code>f</code> <code>c</code> - clear existing filters</p>
+        <p><code>f</code> <code>r</code> - restore previous filters</p>
+
+        <h5>Hover Over Graph Frame</h5>
+        <p><code>a</code> - animate frames of same method to blink, toggles on/off</p>
+        <p><code>z</code> - zoom to frame</p>
+        <p><code>b</code> - backtrace of frame</p>
+        <p><code>p</code> - copy file path of frame into clipboard</p>
+
+        <h5>Hover Over Gem or Method Listing</h5>
+        <p><code>a</code> - animate the highlighted frames to blink, toggles on/off</p>
+        <p><code>z</code> - zoom to frame with most samples in self</p>
+        <p><code>b</code> - backtrace of frame with most samples in self</p>
+        <p><code>p</code> - copy file path of frame with most samples into clipboard</p>
+        <p><code>f</code> <code>i</code> - add/remove from include filter</p>
+        <p><code>f</code> <code>e</code> - add/remove from exclude filter</p>
+        <br/>
+      </div>
+    </div>
+
+    <div id="info-modal" class="ui modal" style="height: 95%; width: 95%;">
+      <i class="close icon"></i>
+      <div class="header">
+      </div>
+      <div class="content">
+      </div>
+    </div>
+
+    <div id="backtrace-modal" class="ui modal" style="height: 95%; width: 95%;">
+      <i class="close icon"></i>
+      <div class="header">
+      </div>
+      <div class="content">
+        <div class="ui top attached tabular menu">
+          <a class="active item" data-tab="first">Backtrace</a>
+          <a class="item" data-tab="second">Direct Calls</a>
+        </div>
+        <div class="backtrace ui bottom attached active tab segment" data-tab="first">
+        </div>
+        <div class="direct-calls ui bottom attached tab segment" data-tab="second">
+        </div>
+      </div>
+    </div>
+
+    <div id="legend" class="ui three column grid" style="margin-top: 5px; ">
+      <script id="filter-item-template" type="text/x-handlebars-template">
+        <div class="ui label" style="margin-bottom: 1px;">
+          {{filter}}
+          <i class="delete icon"></i>
+        </div>
+      </script>
+      <div class="four wide column">
+        <div class="ui segment">
+          <button class="ui button" data-action="help">Help</button>
+          <button class="ui disabled right floated button" data-action="resetZoom">No Zoom</button>
+          <div class="ui clearing divider hidden"></div>
+          <div id="includedFilters" class="">
+          </div>
+          <form class="ui form">
+            <div class="field">
+              <input type="text" id="includeFilter" placeHolder="include filter" value="" />
+            </div>
+            <button class="ui right floated button" data-action="filter" data-type="include">Add</button>
+          </form>
+
+          <div class="ui clearing divider hidden"></div>
+
+          <div id="excludedFilters" class="">
+          </div>
+          <form class="ui form">
+            <div class="field">
+              <input type="text" id="excludeFilter" placeHolder="exclude filter" value="" />
+            </div>
+            <button class="ui right floated button" data-action="filter" data-type="exclude">Add</button>
+          </form>
+
+          <div class="ui clearing divider hidden"></div>
+        </div>
+      </div>
+
+      <div class="six wide column">
+        <table id="gems-table" class="ui compact small selectable table" style="word-break: break-all;">
+          <thead>
+            <tr>
+              <th class="six wide"> <i data-action="color" data-type="gem" class="paint brush icon"></i> Gem  </td>
+
+              <th class="right aligned" > Self </td>
+              <th class="right aligned" > % </td>
+
+              <th class="right aligned" > Total </td>
+              <th class="right aligned"> % </td>
+
+              <th class="right aligned"> # Calls </td>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+          <script id="gem-row-template" type="text/x-handlebars-template">
+            <tr style="background-color: {{color}}; color: {{textColor}}" >
+              <td > {{name}} </td>
+
+              <td class="right aligned" > {{selfSamples}} </td>
+              <td class="right aligned"> {{ofSelfTotal}}% </td>
+
+              <td class="right aligned"> {{samplesLength}} </td>
+              <td class="right aligned"> {{ofTotal}}% </td>
+
+
+              <td class="right aligned"> {{frames.length}} </td>
+            </tr>
+          </script>
+        </table>
+      </div>
+
+      <div class="six wide column">
+        <table id="methods-table" class="ui compact small selectable table" style="word-break: break-all;">
+          <thead>
+            <tr>
+              <th class="six wide"> <i data-action="color" data-type="method" class="paint brush icon"></i>  Method </td>
+              <th class="right aligned"> Self </td>
+              <th class="right aligned"> % </td>
+              <th class="right aligned"> Total </td>
+              <th class="right aligned"> % </td>
+
+              <th class="right aligned"> # Calls </td>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+          <script id="method-row-template" type="text/x-handlebars-template">
+            <tr style="background-color: {{color}}; color: {{textColor}}" >
+              <td> {{displayName}} </td>
+
+              <td class="right aligned"> {{selfSamples}} </td>
+              <td class="right aligned"> {{ofSelfTotal}}% </td>
+
+              <td class="right aligned"> {{samplesLength}} </td>
+              <td class="right aligned"> {{ofTotal}}% </td>
+
+              <td class="right aligned"> {{frames.length}} </td>
+            </tr>
+          </script>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="ui footer basic segment">
+    <div "ui content">
+    </div>
   </div>
   <script>
 
-var data = /**DATA**/;
-var maxX = 0;
-var maxY = 0;
+    var graph_data = /**DATA**/;
+    var data = graph_data.data;
+    var frames = graph_data.frames;
 
-debounce = function(func, wait, trickle) {
-  var timeout;
+    var maxX = 0;
+    var maxY = 0;
 
-  timeout = null;
-  return function() {
-    var args, context, currentWait, later;
-    context = this;
-    args = arguments;
-    later = function() {
-      timeout = null;
-      return func.apply(context, args);
-    };
-
-    if (timeout && trickle) {
-      // already queued, let it through
-      return;
-    }
-
-    if (typeof wait === "function") {
-      currentWait = wait();
-    } else {
-      currentWait = wait;
-    }
-
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-
-    timeout = setTimeout(later, currentWait);
-    return timeout;
-  };
-};
-
-
-var guessGem = function(frame)
-{
-  var split = frame.split('/gems/');
-  if(split.length == 1) {
-    split = frame.split('/app/');
-    if(split.length == 1) {
-      split = frame.split('/lib/');
-    }
-
-    split = split[Math.max(split.length-2,0)].split('/');
-    return split[split.length-1].split(':')[0];
-  }
-  else
-  {
-    return split[split.length -1].split('/')[0];
-  }
-}
-
-var guessMethod = function(frame) {
-  var split = frame.split('`');
-  if(split.length == 2) {
-    var fullMethod = split[1].split("'")[0];
-    split = fullMethod.split("#");
-    if(split.length == 2) {
-      return split[1];
-    }
-    return split[0];
-  }
-  return '?';
-}
-
-var guessFile = function(frame) {
-  var split = frame.split(".rb:");
-  if(split.length == 2) {
-    split = split[0].split('/');
-    return split[split.length - 1];
-  }
-  return "";
-}
-
-$.each(data, function(){
-   maxX = Math.max(maxX, this.x + this.width);
-   maxY = Math.max(maxY, this.y);
-   this.shortName = guessMethod(this.frame);
-});
-
-var width = $(window).width();
-var height = $(window).height() / 1.2;
-
-$('.graph').width(width).height(height);
-
-var xScale = d3.scale.linear()
-	.domain([0, maxX])
-    .range([0, width]);
-
-var yScale = d3.scale.linear()
-    .domain([0, maxY])
-    .range([0,height]);
-
-var realHeight = 0;
-var debouncedHeightCheck = debounce(function(){
-  if (realHeight > 15) {
-    svg.selectAll('text').attr('display','show');
-  } else {
-    svg.selectAll('text').attr('display','none');
-  }
-}, 200);
-
-function zoom()
-{
-  svg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")");
-
-  realHeight = yScale(1) * d3.event.scale;
-  debouncedHeightCheck();
-}
-
-var svg = d3.select(".graph")
-                    .append("svg")
-                    .attr("width", "100%")
-                    .attr("height", "100%")
-                    .attr("pointer-events", "all")
-                    .append('svg:g')
-                    .call(d3.behavior.zoom().on("zoom", zoom))
-                    .append('svg:g');
-
-
-// so zoom works everywhere
-svg.append("rect")
-    .attr("x",function(d) { return xScale(0); })
-    .attr("y",function(d) { return yScale(0);})
-    .attr("width", function(d){return xScale(maxX);})
-    .attr("height", yScale(maxY))
-    .attr("fill", "white");
-
-var color = function() {
-  var r = parseInt(205 + Math.random() * 50);
-  var g = parseInt(Math.random() * 230);
-  var b = parseInt(Math.random() * 55);
-  return "rgb(" + r + "," + g + "," + b + ")";
-}
-var info = {};
-
-// http://stackoverflow.com/questions/1960473/unique-values-in-an-array
-Array.prototype.getUnique = function() {
-    var o = {}, a = []
-    for (var i = 0; i < this.length; i++) o[this[i]] = 1
-    for (var e in o) a.push(e)
-    return a
-}
-
-var samplePercent = function(samples, exclusive){
-  var info = " (" + samples +
-    " sample" + (samples == 1 ? "" : "s") + " - " +
-    ((samples / maxX) * 100).toFixed(2) + "%) ";
-  if (exclusive) {
-    info += " (" + exclusive +
-      " exclusive - " +
-    ((exclusive / maxX) * 100).toFixed(2) + "%) ";
-  }
-  return info;
-}
-
-var mouseover =  function(d) {
-  var i = info[d.frame];
-  $('.info').text( d.frame + " " + samplePercent(i.samples.length, d.topFrame ? d.topFrame.exclusiveCount : 0));
-  d3.selectAll(i.nodes)
-     .attr('opacity',0.5);
-};
-
-var mouseout = function(d) {
-  var i = info[d.frame];
-  $('.info').text("");
-  d3.selectAll(i.nodes)
-     .attr('opacity',1);
-};
-
-// highlight the nodes of a gem
-var gemSelect = function(e) {
-	var name = e.data.name;
-	d3.selectAll(getGemNodes(name)).attr('opacity',0.5);
-	return false;
-};
-
-// remove highlighting of the nodes of a gem
-var gemDeSelect = function(e) {
-	var name = e.data.name;
-	d3.selectAll(getGemNodes(name)).attr('opacity',1);
-	return false;
-};
-
-// given the name of a gem, return all of its nodes
-var getGemNodes = function(gem_name) {
-	var frames = gemStats[gem_name].frames;
-	var nodes = [];
-	$.each(frames, function(i,f) {
-	var i = info[f];
-	nodes = nodes.concat(i.nodes);
-	});
-	return nodes;
-};
-
-var backtrace = function(frame){
-  for(var i=0; i<data.length; i++){
-    if(frame === data[i]){ break; }
-  }
-
-  frames = [frame];
-  var depth = frame.y;
-
-  while(i > 0){
-    if(depth == -1) break;
-
-    if(data[i].y === depth-1) {
-      frames.push(data[i]);
-      depth--;
-    }
-
-    i--;
-  }
-
-  return frames;
-}
-
-$('#frameinfo-wrapper').click(function(d){
-    $(this).hide();
-    $('#frameinfo').hide();
-});
-
-$(window).keyup(function(e) {
-  if (e.keyCode==27)
-    $('#frameinfo-wrapper,#frameinfo').hide();
-});
-
-var click = function(d){
-  var trace = backtrace(d);
-
-  var link = function(path, dest){
-    return path.replace(/[^\/]+:\d+/, function(x){ return "<a target='_blank' href='"+ dest +"'>" + x + "</a>"})
-  };
-
-  var linkify = function(path){
-    var split = path.split("/")[0].split("-");
-    if(["actionview","activerecord","actionpack","railties","activesupport", "rails"].indexOf(split[0]) > -1) {
-      var github = "https://github.com/rails/rails/blob/";
-      var file = path.split(":")[0].split("/");
-      if(split[0] === "rails") {
-        file.shift();
-      } else {
-        file[0] = split[0];
+    var guessGem = function(frame)
+    {
+      var split = frame.split('/lib\/ruby/');
+      if (split.length > 1 && !frame.includes("/gems/")) {
+        split = split[1].split("/")
+          if (split.length > 1) {
+            split = split[1].split(".")
+            return "ruby - " + split[0];
+          }
       }
 
-      github += (split[1].length < 6 ? "v" : "") + split[1] + "/";
-      github += file.join("/");
-      github += "#L" + parseInt(path.split(":")[1]);
-
-      return link(path, github);
-    }
-    return path;
-  }
-
-  var simplify = function(frame){
-    var split = frame.split('/gems/');
-    if(split.length > 1){
-      var path = linkify(split.pop());
-      return "<span class='full-location'>" + split.join('/gems/') + "/</span>" + path;
-    } else {
-      return frame;
-    }
-  }
-
-  var table = trace.map(function(f){
-        var i = info[f.frame];
-        return "<tr><td class='code'>" + simplify(f.frame) + "</td><td class='sample-info'>" +
-                samplePercent(i.samples.length, f.topFrame ? f.topFrame.exclusiveCount : 0) + 
-                "</td></tr>";
-      }).join("\n");
-
-  var table = $('#frameinfo table').html(table);
-  table.find(".full-location").hide().after("<span class='expand'>&hellip; </span>");
-  table.find(".expand").css({cursor: "pointer"}).click(function(){
-      $(this).hide().parent().find(".full-location").show();
-  });
-
-  $('#frameinfo-wrapper').show();
-  $('#frameinfo').show();
-};
-
-// http://stackoverflow.com/a/7419630
-var rainbow = function(numOfSteps, step) {
-    // This function generates vibrant, "evenly spaced" colours (i.e. no clustering). This is ideal for creating easily distiguishable vibrant markers in Google Maps and other apps.
-    // Adam Cole, 2011-Sept-14
-    // HSV to RBG adapted from: http://mjijackson.com/2008/02/rgb-to-hsl-and-rgb-to-hsv-color-model-conversion-algorithms-in-javascript
-    var r, g, b;
-    var h = step / numOfSteps;
-    var i = ~~(h * 6);
-    var f = h * 6 - i;
-    var q = 1 - f;
-    switch(i % 6){
-        case 0: r = 1, g = f, b = 0; break;
-        case 1: r = q, g = 1, b = 0; break;
-        case 2: r = 0, g = 1, b = f; break;
-        case 3: r = 0, g = q, b = 1; break;
-        case 4: r = f, g = 0, b = 1; break;
-        case 5: r = 1, g = 0, b = q; break;
-    }
-    var c = "#" + ("00" + (~ ~(r * 255)).toString(16)).slice(-2) + ("00" + (~ ~(g * 255)).toString(16)).slice(-2) + ("00" + (~ ~(b * 255)).toString(16)).slice(-2);
-    return (c);
-}
-
-// assign some colors, analyze samples per gem
-var gemStats = {}
-var topFrames = {}
-var lastFrame = {frame: 'd52e04d-df28-41ed-a215-b6ec840a8ea5', x: -1}
-
-$.each(data, function(){
-  var by_method = location.search.match(/[?&]by_method=1\b/);
-  var group = by_method ? guessMethod(this.frame) : guessGem(this.frame);
-
-  var stat = gemStats[group];
-
-  if(!stat) {
-    gemStats[group] = stat = {name: group, samples: [], frames: []};
-  }
-
-  stat.frames.push(this.frame);
-  for(var j=0; j < this.width; j++){
-    stat.samples.push(this.x + j);
-  }
-  // This assumes the traversal is in order
-  if (lastFrame.x != this.x) {
-    var topFrame = topFrames[lastFrame.frame]
-    if (!topFrame) {
-      topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
-    }
-    topFrame.exclusiveCount += 1;
-    lastFrame.topFrame = topFrame;
-  }
-  lastFrame = this;
-
-});
-
-var topFrame = topFrames[lastFrame.frame]
-if (!topFrame) {
-  topFrames[lastFrame.frame] = topFrame = {exclusiveCount: 0}
-}
-topFrame.exclusiveCount += 1;
-lastFrame.topFrame = topFrame;
-
-var totalGems = 0;
-$.each(gemStats, function(k,stat){
-  totalGems++;
-  stat.samples = stat.samples.getUnique();
-});
-
-
-var gemsSorted = _(gemStats).pairs()
-                          .sortBy(function(item){
-                              return -item[1].samples.length;
-                            })
-                          .map(function(item){return item[1]})
-                          .value();
-
-var currentIndex = 0;
-_.each(gemsSorted, function(stat){
-
-  stat.color = rainbow(totalGems, currentIndex);
-
-  for(var x=0; x < stat.frames.length; x++) {
-    info[stat.frames[x]] = {nodes: [], samples: [], color: stat.color};
-  }
-
-  currentIndex += 1;
-});
-
-
-
-// see: http://bl.ocks.org/mundhradevang/1387786
-function fontSize(d,i) {
-  var size = yScale(1) / 3;
-  // var words = d.shortName.split(' ');
-  var word = d.shortName; // words[0];
-  var width = xScale(d.width+100);
-  var height = yScale(1);
-  var length = 0;
-  d3.select(this).style("font-size", size + "px").text(word);
-  while((size > 12.1) && ((this.getBBox().width >= width) || (this.getBBox().height >= height)))
-   {
-    size -= 0.1;
-    d3.select(this).style("font-size", size + "px");
-   }
-
-   d3.select(this).attr("dy", size);
-}
-
-svg.selectAll("g")
-	.data(data)
-	.enter()
-    .append("g")
-    .each(function(){
-      d3.select(this)
-      .append("rect")
-      .attr("x",function(d) { return xScale(d.x-1); })
-      .attr("y",function(d) { return yScale(maxY - d.y);})
-      .attr("width", function(d){return xScale(d.width);})
-      .attr("height", yScale(1))
-      .attr("fill", function(d){
-        var i = info[d.frame];
-        if(!i) {
-          info[d.frame] = i = {nodes: [], samples: [], color: color()};
+      split = frame.split('/gems/');
+      if(split.length == 1) {
+        split = frame.split('/app/');
+        if(split.length == 1) {
+          split = frame.split('/lib/');
         }
-        i.nodes.push(this);
-        for(var j=0; j < d.width; j++){
-          i.samples.push(d.x + j);
+
+        split = split[Math.max(split.length-2,0)].split('/');
+        return split[split.length-1].split(':')[0];
+      }
+      else
+      {
+        return split[split.length -1].split('/')[0];
+      }
+    }
+
+    var guessFullMethod = function(frame) {
+      var split = frame.split('`');
+      if(split.length == 2) {
+        var fullMethod = split[1].split("'")[0];
+        return fullMethod;
+      }
+      return '?';
+    }
+
+    var guessShortMethod = function(fullMethod) {
+      var split = fullMethod.split(".");
+      if(split.length > 1) {
+        return split[split.length - 1];
+      }
+
+      split = fullMethod.split("#");
+      if(split.length > 1) {
+        return split[split.length - 1];
+      }
+
+      return split[0];
+    }
+
+    var guessFile = function(frame) {
+      var split = frame.split(".rb:");
+      if(split.length == 2) {
+        split = split[0].split('/');
+        return split[split.length - 1];
+      }
+      return "";
+    }
+
+    var guessFilePath = function(frame) {
+      var split = frame.split(":in");
+      return split[0];
+    }
+
+    var storeOriginals = function(data) {
+      for(var i=0; i < data.length; i++) {
+        var d = data[i];
+        d.id = i;
+        d.oWidth = d.oWidth || d.width;
+        d.oX = d.oX || d.x;
+        d.oY = d.oY || d.y;
+
+        frame = frames[d.frame_id]
+        if (parsedNames[frame]) {
+          d.methodName = parsedNames[frame].methodName;
+          d.shortMethodName = parsedNames[frame].shortMethodName;
+          d.gemName = parsedNames[frame].gemName;
+          d.fileName = parsedNames[frame].fileName;
+        } else {
+          parsedNames[frame] = {};
+          parsedNames[frame].methodName = d.methodName = guessFullMethod(frame);
+          parsedNames[frame].shortMethodName = d.shortMethodName = guessShortMethod(d.methodName);
+          parsedNames[frame].gemName = d.gemName = guessGem(frame);
+          parsedNames[frame].fileName = d.fileName = guessFile(frame);
         }
-        return i.color;
-      })
-      .on("click", click)
-      .on("mouseover", mouseover)
-      .on("mouseout", mouseout)
-      .attr("cursor", "pointer");
 
-      d3.select(this)
-        .append("text")
-        .attr("x",function(d) { return xScale(d.x - 0.98); })
-        .attr("y",function(d) { return yScale(maxY - d.y);})
-        .on("click", click)
-        .on("mouseover", mouseover)
-        .on("mouseout", mouseout)
-        .each(fontSize)
-        .attr("cursor", "pointer")
-        .attr("display", "none");
+        d.opacityFactor = 1;
+        setSamples(d);
+      }
+    }
 
+    var setSamples = function(d) {
+      d.samplesLength = d.oWidth;
+    }
+
+    $.each(data, function(){
+       maxX = Math.max(maxX, this.x + this.width);
+       maxY = Math.max(maxY, this.y);
+    });
+
+    oMaxX = maxX;
+    oMaxY = maxY;
+
+    var width = $("#main").width();
+    var height = ($(window).height() / 1.35);
+    $('.graph').width(width).height(height);
+    $('#legend').height($(window).height() - height).css({overflow: "scroll"});
+
+    var xScale = d3.scale.linear()
+      .domain([0, maxX])
+        .range([0, width]);
+
+    var yScale = d3.scale.linear()
+        .domain([0, maxY])
+        .range([0,height]);
+
+    var graph = d3.select(".graph")
+                        .attr("width", "100%")
+                        .attr("height", "100%");
+
+    var color = function() {
+      var r = parseInt(205 + Math.random() * 50);
+      var g = parseInt(Math.random() * 230);
+      var b = parseInt(Math.random() * 55);
+      return "rgb(" + r + "," + g + "," + b + ")";
+    }
+    var info = {
+      gem: {},
+      method: {}
+    };
+
+    var parsedNames = {}
+
+    var templates = {};
+    var template = function(name) {
+      templates[name] = templates[name] || Handlebars.compile($("#" + name).html());
+      return templates[name];
+    };
+
+    var frameStats = function(d) {
+      frame = frames[d.frame_id]
+      var i = info[byType][frame];
+
+      inSet = dataStats["method"][d.frame_id];
+
+      var childrenSize = 0;
+      $.each(d.filteredChildren || [], function() {
+        childrenSize = childrenSize + this.samplesLength;
+      });
+
+      d.filePath = d.filePath || guessFilePath(frame);
+
+      var stat = {
+        id: d.id,
+        name: d.methodName,
+        shortName: d.shortMethodName,
+        gemName: d.gemName,
+        filePath: d.filePath,
+        frame: frame,
+        samples: d.samplesLength,
+        selfSamples: d.samplesLength - childrenSize,
+        ofZoom: inSet ? "no zoom" : "beyond zoom",
+        ofParent: "No Parent ",
+        ofTotal: ((d.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
+        totalSamples: i.samplesLength,
+        allOfTotal: ((i.samplesLength / (oMaxX - 1)) * 100).toFixed(2),
+        calls: inSet ? dataStats["method"][d.frame_id].count : "beyond zoom"
+      };
+
+      if (d.filteredParent) {
+        stat['ofParent'] = ((d.samplesLength / d.filteredParent.samplesLength) * 100).toFixed(2);
+      }
+
+      if (inSet && currentZoom) {
+        stat["ofZoom"] = ((d.samplesLength / currentZoom.samplesLength) * 100).toFixed(2);
+      }
+
+      return stat;
+    }
+
+    var copyToClipboard = function(text) {
+      var clip = new Clipboard("lala", {
+        text: function() { return text; },
+        action: function() { return "copy"; },
+        target: function() { return undefined; }
+      });
+      clip.onClick({});
+    }
+
+    var mouseover = function(d) {
+      keyboardJS.setContext("frame");
+      currentFrame = d;
+
+      var stat = frameStats(d);
+
+      $('.ui.footer').html(template("info-table-template")({stats: [stat]})).show();
+      d3.selectAll("div.frame[frameId='" + d.frame_id + "']")
+        .style('background-color', "black")
+        .style('color', "white")
+        .style('opacity', 0.5);
+    };
+
+    var mouseout = function(d) {
+      keyboardJS.setContext("");
+      currentFrame = null;
+
+      var frame = frames[d.frame_id];
+      var i = info[byType][frame];
+      $('.ui.footer').hide().children().remove();
+      d3.selectAll("div.frame[frameId='" + d.frame_id + "']")
+        .style('background-color', function(d) { return d.fill; })
+        .style('color', function(d) { return d.textColor; })
+        .style('opacity', function(f) { return f.opacityFactor });
+    };
+
+    var selectElement = function(e) {
+      keyboardJS.setContext(e.data.type);
+      var name = e.data.name;
+      var type = e.data.type;
+      if (type == "method") {
+        type = "frameId"
+      }
+      currentElement = name;
+      d3.selectAll("div.frame[" + type +"='" + name + "']")
+        .style('background-color', "black")
+        .style('color', "white")
+        .style('opacity', 0.5);
+      return false;
+    };
+
+    var deselectElement = function(e) {
+      keyboardJS.setContext('');
+      currentElement = null;
+      var name = e.data.name;
+      var type = e.data.type;
+      if (type == "method") {
+        type = "frameId"
+      }
+      d3.selectAll("div.frame[" + type + "='" + name + "']")
+        .attr('data-blink', "")
+        .style('background-color', function(d) { return d.fill; })
+        .style('color', function(d) { return d.textColor; })
+        .style('opacity', function(d) { return d.opacityFactor });
+      return false;
+    };
+
+    var backtrace = function(frame){
+      var frames = [frame];
+
+      var parent = filteredParent(frame)
+      while (parent) {
+        frames.push(parent);
+        parent = filteredParent(parent)
+      }
+
+      return frames;
+    }
+
+    var zoomedDataFilter = function(d) {
+      if (!currentZoom) {
+        return true
+      }
+
+      return d.zoomed;
+    }
+
+    var anyActiveFilters = function() {
+      return includedFilters.length > 0 || excludedFilters.length > 0;
+    };
+
+    var filteredDataFilter = function(d) {
+      if (!anyActiveFilters()) {
+        return true;
+      }
+
+      return d.filteredIn;
+    }
+
+    var resetElement = function(e) {
+      if (!e.filteredOut) {
+        if (!e.filteredIn) {
+          e.y = e.oY;
+        }
+        e.x = e.oX;
+        e.width = e.oWidth;
+        e.opacityFactor = 1;
+        e.zoomed = null;
+      }
+    }
+
+    var resetData = function() {
+      for(var i = 0; i < data.length; i++) {
+        var d = data[i];
+
+        resetElement(d);
+      }
+    }
+
+    var resetZoom = function() {
+      zoom(null);
+    }
+
+    var zoom = function(d, options) {
+      if (currentZoom) {
+        lastZoom = currentZoom;
+      }
+
+      currentZoom = d;
+
+      resetData();
+      var setZoom = function(child) {
+        child.zoomed = true;
+        child.x = child.x - d.oX + 1;
+      }
+
+      if (currentZoom) {
+        if (!d.allChildren) {
+          setZoom(d);
+          determineFilteredChildren(d, function(child) {
+            setZoom(child);
+          });
+        } else {
+          $.each([d].concat(d.allChildren), function() {
+            setZoom(this);
+          });
+        }
+        $("[data-action=resetZoom]").removeClass("disabled").text("Reset Zoom");
+      } else {
+        $("[data-action=resetZoom]").addClass("disabled").text("No Zoom");
+      }
+
+      processData(data);
+      drawData(data, options);
+
+      return false;
+    }
+
+    var showInfo = function(e){
+      var name = e.data.name;
+      var type = e.data.type;
+
+      var set = dataStats[type][name];
+
+      $modal = $("#info-modal");
+      $modal.find(".header").text(type + " " + name + " Info");
+
+      var stats = set.data.map(frameStats);
+      stats = stats.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
+
+      $modal.find('.content').html(template("info-table-template")({stats: stats}));
+
+      $modal.find(".search.icon").on("click", function() {
+        var id = parseInt($(this).data("id"), 10);
+        zoom(data[id]);
+        $modal.modal('hide');
+        return false;
+      });
+
+      $modal.modal('show');
+
+      return false;
+    };
+
+    var showBacktrace = function(d){
+      var trace = backtrace(d);
+
+      $modal = $("#backtrace-modal");
+
+      $modal.find(".header").text("Backtrace Info");
+      var stats = trace.map(frameStats)
+      $modal.find('.backtrace').html(template("info-table-template")({stats: stats}));
+
+
+      stats = d.filteredChildren.map(frameStats);
+      $modal.find('.direct-calls').html(template("info-table-template")({stats: stats}));
+
+      $modal.find(".search.icon").on("click", function() {
+        var id = parseInt($(this).data("id"), 10);
+        zoom(data[id]);
+        $modal.modal('hide');
+        return false;
+      });
+
+      $modal.modal('show');
+
+      return false;
+    };
+
+    var byType = "method";
+
+    var dataStats = {
+      gem: {},
+      method: {},
+    };
+
+    var dataSorted = {
+      gem: {},
+      method: {},
+    };
+
+    var colors = {
+      gem: {},
+      method: {}
+    };
+
+    var typeKey = function(type) {
+      if (type == "method") return "frame_id";
+      return "gemName";
+    }
+
+    function analyzeData(data, type) {
+      type = type || byType;
+
+      dataStats[type] = {}
+      dataSorted[type] = {}
+
+      // assign some colors, analyze samples per type
+      $.each(data, function(){
+        var group = this[typeKey(type)];
+        var stat = dataStats[type][group];
+
+        if(!stat) {
+          dataStats[type][group] = stat = {count: 0, displayName: group, name: group, samplesLength: 0, samples: {}, frames: [], data: []};
+          if (type == "method") {
+            dataStats[type][group].displayName = this.methodName;
+          }
+        }
+
+
+        var frame = frames[this.frame_id];
+        stat.count = stat.count + 1;
+        stat.frames.push(frame);
+        stat.data.push(this);
+        for(var j=0; j < this.width; j++){
+          stat.samples[this.x + j] = 1;
+        }
+      });
+
+      var totalGroupData = 0;
+      $.each(dataStats[type], function(k,stat){
+        totalGroupData++;
+        stat.samplesLength = Object.keys(stat.samples).length;
+      });
+
+
+      dataSorted[type] = _(dataStats[type]).pairs()
+                                .sortBy(function(item){
+                                    return -item[1].samplesLength;
+                                  })
+                                .map(function(item){return item[1]})
+                                .value();
+
+      var currentIndex = 0;
+      var rColors = randomColor({count: totalGroupData});
+      var colorStats = function(stat){
+
+        stat.color = colors[type][stat.name] = colors[type][stat.name] || rColors[currentIndex];
+
+        for(var x=0; x < stat.frames.length; x++) {
+          info[type][stat.frames[x]] = info[type][stat.frames[x]] || {samplesLength: 0, samples: {}, color: stat.color};
+          info[type][stat.frames[x]].color = info[type][stat.frames[x]].color || stat.color;
+        }
+
+        currentIndex += 1;
+      };
+
+      _.each(dataSorted[type], colorStats);
+    }
+
+    var directFilteredChildren = function(d) {
+      if (!anyActiveFilters()) {
+        return d.children;
+      }
+
+      return filteredChildren(d).filter(function(c) { return c.y == d.y + 1 });
+    };
+
+    var determineFilteredChildren = function(d, fn) {
+      for (var i = 0; i < d.filteredChildren.length; i++) {
+        var child = d.filteredChildren[i];
+        determineFilteredChildren(child, fn);
+        fn(child);
+      }
+    }
+
+    var filteredChildren = function(d) {
+      return d.allChildren.filter(filteredDataFilter);
+    };
+
+    var filteredParent = function(d) {
+      if (!d.allParents) {
+        var parent = d.parent;
+        while (parent) {
+          if (filteredDataFilter(parent)) {
+            return parent;
+          }
+          parent = parent.parent;
+        }
+        return;
+      }
+      return d.allParents.filter(filteredDataFilter)[0];
+    };
+
+    var visibleParent = function(d) {
+      return d.allParents.filter(filteredDataFilter).filter(zoomedDataFilter)[0];
+    };
+
+    var setRelations = function(data) {
+      var length = data.length;
+      for(var i=0; i < data.length; i++) {
+        var d = data[i];
+        var depth = d.oY;
+
+        d.parent = null;
+        d.children = [];
+        d.allParents = null;
+        d.allChildren = null;
+
+        if (d.oY == 1) {
+          continue;
+        }
+
+        var x = i;
+        while(x >= 0){
+          data[x].children = data[x].children || [];
+
+          if ( data[x].oY === depth - 1 ) {
+            d.parent = data[x];
+            var parent = d.parent;
+          //while (parent) {
+          //  d.allParents.push(parent);
+          //  parent.allChildren = parent.allChildren || [];
+          //  parent.allChildren.push(d);
+          //  parent = parent.parent;
+          //}
+            data[x].children.push(d);
+            break;
+          }
+
+          x--;
+        }
+
+      }
+    }
+
+    function setMaxX(data, zoomedAndFiltered) {
+      maxX = d3.max(zoomedAndFiltered, function(d) { return d.x + d.width});
+
+      xScale = d3.scale.linear()
+        .domain([0, maxX])
+        .range([0, width]);
+
+      return maxX;
+    }
+
+    function setMaxY(data, visibleData) {
+      maxY = -1;
+      minY = Infinity;
+
+      maxY = d3.max(visibleData, function(d) { return d.y; });
+      minY = d3.min(visibleData, function(d) { return d.y; });
+
+      yScale = d3.scale.linear()
+        .domain([0, maxY - minY + 1])
+        .range([0,height]);
+
+      return maxY;
+    }
+
+    function processFrameInfo(data, type) {
+      for(var i=0; i < data.length; i++) {
+        var d = data[i];
+
+        var frame = frames[d.frame_id];
+        info[type][frame] = info[type][frame] || {samplesLength: 0, samples: {}, color: null};
+        var info_frame = info[type][frame];
+        info_frame.samplesLength = info_frame.samplesLength + d.width;
+      }
+    }
+
+    function processData(data) {
+      zoomedAndFiltered = zoomedAndFilteredData(data);
+
+      setMaxX(data, zoomedAndFiltered);
+
+      var invertedDisplayWidth = xScale.invert(displayWidth);
+      visibleData = zoomedAndFiltered.filter(function(d) {
+        return d.width > invertedDisplayWidth;
+      });
+
+      setMaxY(data, visibleData);
+
+      var xHash = {};
+      var yHash = {};
+      var wHash = {};
+
+      var scaledH = yScale(1);
+
+
+      for(var i=0; i < visibleData.length; i++) {
+        var d = visibleData[i];
+
+        xHash[d.x] = xHash[d.x] || xScale(d.x - 1);
+        d.scaledX = xHash[d.x];
+
+        yHash[d.y] = yHash[d.y] || yScale(maxY - d.y);
+        d.scaledY = yHash[d.y];
+
+        wHash[d.width] = wHash[d.width] || xScale(d.width);
+        d.displayW = d.scaledW = wHash[d.width];
+
+        d.scaledH = scaledH;
+
+        var frame = frames[d.frame_id];
+        var info_frame = info[byType][frame];
+        d.fill = colors[byType][d[typeKey(byType)]];
+      }
+    }
+
+    var textColors = {};
+    function textColorForFill(d) {
+      if (!d.fill) {
+        return null;
+      }
+
+      textColors = textColors || {};
+      if (textColors[d.fill]) {
+        return textColors[d.fill];
+      }
+
+      var color = tinycolor(d.fill);
+      textColors[d.fill] = (color.isLight()) ? "black" : "lightyellow";
+
+      return textColors[d.fill];
+    }
+
+    function resetFilter() {
+      for(var i = 0; i < data.length; i++) {
+        var d = data[i];
+        d.filteredIn = null;
+        d.filteredOut = null;
+        d.filteredChildren = d.children;
+        d.filteredParent = d.parent;
+      }
+    };
+
+    function filterDataByFrame(includedFilters, excludedFilters) {
+      resetFilter();
+
+      if (includedFilters.length > 0 || excludedFilters.length > 0) {
+        for(var i=0; i < data.length; i++) {
+          var d = data[i];
+          d.filteredChildren = [];
+
+          var shouldInclude = false;
+          var shouldExclude = true;
+
+          var frame = frames[d.frame_id];
+          if (includedFilters.length > 0) {
+            shouldInclude = includedFilters.some(function(v) { return frame.indexOf(v) >= 0; })
+          } else {
+            shouldInclude = true;
+          }
+
+          if (excludedFilters.length > 0) {
+            shouldExclude = excludedFilters.some(function(v) { return frame.indexOf(v) >= 0; });
+          } else {
+            shouldExclude = false;
+          }
+
+          if (shouldInclude && !shouldExclude) {
+            d.y = d.oY;
+            d.filteredIn = true;
+            d.filteredParent = filteredParent(d);
+            d.filteredChildren = d.filteredChildren || [];
+            if (d.filteredParent) {
+              d.filteredParent.filteredChildren.push(d);
+              d.y = d.filteredParent.y + 1;
+            } else {
+              d.y = 1;
+            }
+          } else {
+            d.filteredOut = true;
+            d.y = -1;
+          }
+        }
+      }
+
+    }
+
+    function remove_odd_nodes() {
+      var remove = data.filter(function(d) {
+        return d.oY > 1 && !d.parent;
+      });
+
+      $.each(remove, function() {
+        remove_node_and_children(this);
+      });
+    }
+
+    function remove_node_and_children(node) {
+      var i = data.indexOf(node);
+      data.splice(i, 1);
+
+      $.each(node.children, function() {
+        remove_node_and_children(this);
+      });
+    }
+
+    var zoomedAndFilteredData = function(data) {
+      return data.filter(zoomedDataFilter).filter(filteredDataFilter);
+    }
+
+    function drawData(data, options) {
+      options = options || {};
+
+      var display_width_filter = function(d) {
+        return d.displayW > displayWidth;
+      }
+
+      analyzeData(zoomedAndFiltered, "method");
+      analyzeData(zoomedAndFiltered, "gem");
+
+      var filteredData = visibleData;
+
+      var rects = graph.selectAll("div")
+        .data(filteredData);
+
+        rects.enter()
+          .append("div")
+          .attr("class", "frame")
+          .on("contextmenu", showBacktrace)
+          .on("click", zoom)
+          .on("mouseover", mouseover)
+          .on("mouseout", mouseout);
+
+      rects.exit().style("display", "none");
+
+      var stroke = 1;
+      if (maxY - minY > 100) {
+        stroke = 0;
+      }
+
+      fontSize = filteredData[0].scaledH * 0.5;
+      if (fontSize > 12) {
+        fontSize = 12;
+      }
+
+      rects
+        .each(function(d) { d.node = this; } )
+        .attr("nodeId", function(d) { return d.id } )
+        .attr("frameId", function(d) { return d.frame_id } )
+        .attr("gem", function(d) { return d.gemName } )
+        .attr("method", function(d) { return d.methodName } )
+        .style("display", "block")
+        .style("position", "absolute")
+        .style("left",function(d) { return d.scaledX + "px"; })
+        .style("top",function(d) { return d.scaledY + "px"; })
+        .style("width", function(d){ return (d.displayW - stroke) + "px"; })
+        .style("height", function(d){ return (d.scaledH - stroke) + "px"; })
+        .style("background-color", function(d){ 
+          d.fill = d.fill || colors[byType][d[typeKey(byType)]];
+          return d.fill; 
+        })
+        .style("color", function(d){ 
+          return textColorForFill(d);
+        })
+        .style("opacity", function(d){ return d.opacityFactor; })
+        .style("font-size", fontSize + "px")
+        .style("cursor", "pointer")
+        .text(function(d) { 
+          var text = d.shortMethodName;
+          if (d.displayW < 40) {
+            text = "";
+          }
+          return text;
+        });
+
+      setTimeout(function(rects) {
+        renderLegend("gem");
+        renderLegend("method");
+      }, 10, rects);
+    }
+
+    function htmlEscape(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+
+    function renderLegend(type) {
+      // render the legend
+      var maxPoint = oMaxX - 1;
+
+      if (currentZoom) {
+        maxPoint = currentZoom.samplesLength;
+      }
+
+      $.each(dataSorted[type], function() {
+        this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
+        var sampleSize = 0;
+        var childrenSize = 0;
+        $.each(this.data || [], function() {
+          var d = this;
+          sampleSize = sampleSize + this.samplesLength;
+          d.filteredChildren = d.filteredChildren || directFilteredChildren(d);
+          $.each(d.filteredChildren, function() {
+            childrenSize = childrenSize + this.samplesLength;
+          });
+        });
+        this.selfSamples = sampleSize - childrenSize;
+        this.ofSelfTotal = ((this.selfSamples / maxPoint) * 100).toFixed(2);
+        this.ofTotal = ((this.samplesLength / maxPoint) * 100).toFixed(2);
+        var color = tinycolor(this.color);
+        this.textColor = (color.isLight()) ? "black" : "lightyellow";
+      });
+
+      var dataDisplay = dataSorted[type].filter(function(s) {
+        return s.ofSelfTotal > 0.1;
+      });
+      dataDisplay = dataDisplay.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
+
+      $("#" + type + "s-table tbody").children().remove();
+      _.each(dataDisplay, function(display) {
+        var html = $($.trim(template(type + "-row-template")(display)))
+          .on("mouseover", {name: display.name, type: type}, selectElement)
+          .on("mouseout", {name: display.name, type: type}, deselectElement)
+          .on("click", {name: display.name, type: type}, showInfo);
+
+        $("#" + type + "s-table tbody").append(html);
+      });
+    }
+
+    function displayFilters(options) {
+      options = options || {};
+      var forType = function(type) {
+        var values = window[type + "Filters"];
+        var $container = $("#" + type + "Filters");
+        $container.children().remove();
+        $.each(values, function() {
+          var html = $($.trim(template("filter-item-template")({filter: this})));
+
+          html.find(".delete").on("click", {type: type, filter: this}, function(e) {
+            var index = window[e.data.type + "Filters"].indexOf(e.data.filter.toString());
+            window[e.data.type + "Filters"].splice(index, 1);
+            displayFilters();
+
+            return false;
+          });
+
+          $container.append(html);
+        });
+      };
+
+      forType("included");
+      forType("excluded");
+
+      filterDataByFrame(includedFilters, excludedFilters);
+
+      zoom(currentZoom, options);
+    };
+
+    function smallThanChildren() {
+      return data.filter(function(d) {
+        var sampleSize = d.oWidth;
+        var childrenSize = 0;
+        $.each(d.children || [], function() {
+          childrenSize = childrenSize + this.oWidth;
+        });
+        d.childrenSize = childrenSize;
+        return childrenSize > sampleSize;
+      });
+    }
+
+    var displayWidth = 1;
+    var includedFilters = /**JS_INCLUDE_FILTERS**/;
+    var excludedFilters = /**JS_EXCLUDE_FILTERS**/;
+    var currentZoom = null;
+    var lastZoom = null;
+
+    storeOriginals(data);
+    setRelations(data);
+
+    processFrameInfo(data, "method");
+    processFrameInfo(data, "gem");
+
+    displayFilters({enter: true});
+
+    var colorFrames = function(type) {
+      byType = type;
+      processData(data);
+      drawData(data);
+
+      $("[data-action=color]").css({color: "black"});
+      $("[data-type=" + byType + "][data-action=color]").css({color: "red"});
+    };
+
+    $("[data-action=color]").on("click", function() {
+      colorFrames($(this).data("type"));
+    });
+
+    $("button[data-action=resetZoom]").on("click", function() {
+      resetZoom();
+      return false;
+    });
+
+    $("button[data-action=help]").on("click", function() {
+      $("#keyboard-modal").modal('show');
+      return false;
+    });
+
+    $("button[data-action=filter]").on("click", function() {
+      var type = $(this).data("type");
+
+      var $text = $("#" + type + "Filter");
+      var value = $.trim($text.val());
+
+      if (value == "") {
+        return false;
+      }
+
+      window[type + "dFilters"].push(value);
+      $text.val("");
+
+      displayFilters();
+
+      return false;
+    });
+
+    $("#backtrace-modal a.item").tab();
+
+    // keyboard settings
+
+    var commands = [];
+    var inField = false;
+    var currentFrame = null;
+    var currentElement = null;
+
+    keyboardJS.bind('?', function(e) {
+      $("#keyboard-modal").modal('show');
+    });
+
+    // start a filtering context
+    keyboardJS.bind('f', function(e) {
+      if (inField) return;
+      keyboardJS.setContext("filter");
+    });
+
+    // start a gem context
+    keyboardJS.bind('g', function(e) {
+      if (inField) return;
+
+      keyboardJS.setContext("gem");
+    });
+
+    // start a method context
+    keyboardJS.bind('m', function(e) {
+      if (inField) return;
+
+      keyboardJS.setContext("method");
+    });
+
+    // reset zoom
+    keyboardJS.bind('0', function(e) {
+      if (inField) return;
+
+      resetZoom();
+    });
+
+    // zoom out
+    keyboardJS.bind('-', function(e) {
+      if (inField) return;
+
+      if (currentZoom) {
+        if (currentZoom.filteredParent) {
+          zoom(currentZoom.filteredParent);
+        }
+      }
+    });
+
+    // go to last zoom
+    keyboardJS.bind('=', function(e) {
+      if (inField) return;
+
+      if (lastZoom) {
+        zoom(lastZoom);
+      }
+    });
+
+    _.each(["gem", "method"], function(type) {
+      keyboardJS.withContext(type, function() {
+        keyboardJS.bind('c', function(e) {
+          colorFrames(type);
+        });
+
+        var findTopElement = function(name) {
+          var set = dataStats[type][currentElement];
+          var stats = set.data.map(frameStats);
+          stats = stats.sort(function(a, b) { return b.selfSamples - a.selfSamples; });
+          return stats[0];
+        };
+
+        keyboardJS.bind('z', function(e) {
+          if (!currentElement) return;
+
+          zoom(data[findTopElement(currentElement).id]);
+        });
+
+        keyboardJS.bind('b', function(e) {
+          if (!currentElement) return;
+
+          showBacktrace(data[findTopElement(currentElement).id]);
+        });
+
+        keyboardJS.bind('p', function(e) {
+          if (!currentElement) return;
+
+          copyToClipboard(findTopElement(currentElement).filePath);
+        });
+
+        keyboardJS.bind('a', function(e) {
+          if (!currentElement) return;
+
+          var blink = "true";
+          var key = type;
+          if (key == "method") {
+            key = "frameId";
+          }
+          var matcher = "div.frame[" + key + "='" + currentElement + "']";
+
+          if ($(matcher + "[data-blink=true]").length) {
+            blink = "";
+          }
+
+          d3.selectAll(matcher).attr('data-blink', blink);
+        });
+      });
+    });
+
+    keyboardJS.withContext('filter', function() {
+      keyboardJS.bind('c', function(e) {
+        previousIncludedFilters = includedFilters;
+        previousExcludedFilters = excludedFilters;
+        includedFilters = [];
+        excludedFilters = [];
+
+        displayFilters();
+
+        keyboardJS.setContext("");
+      });
+
+      keyboardJS.bind('r', function(e) {
+        includedFilters = previousIncludedFilters;
+        excludedFilters = previousExcludedFilters;
+
+        displayFilters();
+
+        keyboardJS.setContext("");
+      });
+
+      keyboardJS.bind('i', function(e) {
+        if (!currentElement) return;
+
+        if(_.contains(includedFilters, currentElement)) {
+          includedFilters = _.without(includedFilters, currentElement);
+        } else {
+          includedFilters.push(currentElement);
+        }
+
+        displayFilters();
+
+      });
+
+      keyboardJS.bind('e', function(e) {
+        if (!currentElement) return;
+
+        if(_.contains(excludedFilters, currentElement)) {
+          excludedFilters = _.without(excludedFilters, currentElement);
+        } else {
+          excludedFilters.push(currentElement);
+        }
+
+        displayFilters();
+
+      });
+    });
+
+    keyboardJS.withContext('frame', function() {
+      keyboardJS.bind("z", function(e) {
+        zoom(currentFrame);
+        keyboardJS.setContext("");
+
+      });
+
+      keyboardJS.bind("a", function(e) {
+        if (!currentFrame) return;
+        var blink = "true";
+        var matcher = "div.frame[method='" + currentFrame.methodName + "']";
+
+        if ($(matcher + "[data-blink=true]").length) {
+          blink = "";
+        }
+
+        d3.selectAll(matcher).attr('data-blink', blink);
+      });
+
+      keyboardJS.bind("b", function(e) {
+        showBacktrace(currentFrame);
+        keyboardJS.setContext("");
+      });
+
+      keyboardJS.bind("p", function(e) {
+        copyToClipboard(currentFrame.filePath)
+        keyboardJS.setContext("");
+      });
     });
 
 
-// Samples may overlap on the same line
-for (var r in info) {
-  if (info[r].samples) {
-    info[r].samples = info[r].samples.getUnique();
-  }
-};
+    $("input").focus(function() {
+      inField = true;
+    }).blur(function() {
+      inField = false;
+    });
 
-
-// render the legend
-_.each(gemsSorted, function(gem){
-  var node = $("<div></div>")
-    .css("background-color", gem.color)
-    .text(gem.name + " " + samplePercent(gem.samples.length))
-	.on("mouseover", {name: gem.name}, gemSelect)
-    .on("mouseout", {name: gem.name}, gemDeSelect);
-  $('.legend').append(node);
-});
-
+    new Clipboard('.icon.copy');
 
   </script>
 </body>

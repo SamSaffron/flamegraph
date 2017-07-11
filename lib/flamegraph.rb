@@ -47,7 +47,7 @@ module Flamegraph
 
     embed_resources = (filename && !opts.key?(:embed_resources)) || opts[:embed_resources]
 
-    renderer = Flamegraph::Renderer.new(backtraces)
+    renderer = Flamegraph::Renderer.new(backtraces, opts)
     rendered = renderer.graph_html(embed_resources)
 
     if filename
