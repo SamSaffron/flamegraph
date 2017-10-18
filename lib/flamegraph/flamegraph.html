@@ -306,6 +306,10 @@ $(window).keyup(function(e) {
 });
 
 var click = function(d){
+  if (d3.event.defaultPrevented) {
+      return;
+  }
+
   var trace = backtrace(d);
 
   var link = function(path, dest){
