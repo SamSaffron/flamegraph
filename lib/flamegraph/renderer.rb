@@ -26,13 +26,11 @@ class Flamegraph::Renderer
     prev = []
 
     # a 2d array makes collapsing easy
-    @stacks.each_with_index do |stack, pos|
-
-      next unless stack
+    @stacks.map! { |s| s.map!(&:to_s).reverse! }.delete_if{|s| s.to_a.empty? }.sort_by!{|a| a }.each_with_index do |stack, pos|
 
       col = []
 
-      stack.reverse.map{|r| r.to_s}.each_with_index do |frame, i|
+      stack.each_with_index do |frame, i|
 
         if !prev[i].nil?
           last_col = prev[i]
