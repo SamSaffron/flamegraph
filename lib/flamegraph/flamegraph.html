@@ -3,6 +3,9 @@
 <head>
   /**INCLUDES**/
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js"></script>
+
   <meta charset=utf-8 />
 
   <title>Flame Graph of Page</title>
@@ -311,12 +314,27 @@
       var split = frame.split('`');
       if(split.length == 2) {
         var fullMethod = split[1].split("'")[0];
-        return fullMethod;
+        if (fullMethod.indexOf('sql_flame') < 0) {
+          return fullMethod;
+        }
+
+
+        fullMethod = fullMethod.replace(/sql_flame_/, "SQL: ");
+        return fullMethod.replace(/_a(\d+)/g, function(match, ord) {
+          return String.fromCharCode(parseInt(ord, 10));
+        })
       }
       return '?';
     }
 
     var guessShortMethod = function(fullMethod) {
+      if (fullMethod.indexOf("#SQL: ")) {
+        var split = fullMethod.split("#SQL: ");
+        if(split.length > 1) {
+          return "SQL: " + split[split.length - 1];
+        }
+      }
+
       var split = fullMethod.split(".");
       if(split.length > 1) {
         return split[split.length - 1];
@@ -1409,6 +1427,9 @@
     });
 
     new Clipboard('.icon.copy');
+
+    new Tablesort(document.getElementById('methods-table'));
+    new Tablesort(document.getElementById('gems-table'));
 
   </script>
 </body>

@@ -21,6 +21,11 @@ require "flamegraph/version"
 require "flamegraph/renderer"
 require "flamegraph/sampler"
 
+begin
+  require "flamegraph/active_record_sql_recorder"
+rescue
+end
+
 module Flamegraph
   def self.generate(filename=nil, opts = {})
     fidelity = opts[:fidelity]  || 0.5
