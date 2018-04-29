@@ -28,6 +28,8 @@ end
 
 module Flamegraph
   def self.generate(filename=nil, opts = {})
+    Thread.current[:sql_flame] = true
+
     fidelity = opts[:fidelity]  || 0.5
 
     backtraces =
@@ -61,5 +63,7 @@ module Flamegraph
       end
     end
     rendered
+  ensure
+    Thread.current[:sql_flame] = nil
   end
 end
