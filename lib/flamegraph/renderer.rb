@@ -12,8 +12,10 @@ class Flamegraph::Renderer
     body.sub! "/**INCLUDES**/",
       if embed_resources
         embed(
-          "semantic.min.css", "jquery.min.js", "d3.min.js", "lodash.min.js", "semantic.min.js", 
-          "handlebars.min.js", "keyboard.min.js", "randomColor.min.js", "clipboard.min.js", "tinycolor.min.js"
+          'semantic.min.css', 'jquery.min.js', 'd3.min.js', 'lodash.min.js', 'semantic.min.js', 
+          'handlebars.min.js', 'keyboard.min.js', 'randomColor.min.js', 'clipboard.min.js', 'tinycolor.min.js',
+          'tablesort.min.js', 'tablesort.number.min.js'
+
         )
       else
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.10/semantic.min.css" />
@@ -25,7 +27,9 @@ class Flamegraph::Renderer
 <script src="https://cdnjs.cloudflare.com/ajax/libs/keyboardjs/2.3.3/keyboard.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/randomcolor/0.5.2/randomColor.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.6.0/clipboard.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.1/tinycolor.min.js"></script>'
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinycolor/1.4.1/tinycolor.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/tablesort.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.0.2/sorts/tablesort.number.min.js"></script>'
       end
 
     body.sub!("/**DATA**/", ::JSON.generate(graph_data));
