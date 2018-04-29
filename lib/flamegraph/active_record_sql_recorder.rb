@@ -1,43 +1,42 @@
 require 'active_record/connection_adapters/abstract/database_statements'
 
-class SQLRecorder # :nodoc:
-  attr_reader :sql
-  def initialize(sql)
-    @sql = sql
-  end
-
-  def run_sql(function)
-    if ENV['WITH_FLAME']
-      object.send method_name, function
-    else
-      function.call
+module Flamegraph
+  class SQLRunner # :nodoc:
+    attr_reader :sql
+    def initialize(sql)
+      @sql = sql
     end
-  end
 
-  private
-
-  def method_name
-    @method_name ||=
-      begin
-        sql_statement = sql.respond_to?(:to_sql) ? sql.to_sql : sql
-        obfuscated_sql = NewRelic::Agent::Database.obfuscate_sql(sql_statement)
-        # .parameterize.underscore
-        ascii_sql = obfuscated_sql.gsub(/[^A-Za-z0-9]/) { |s| '_a' + s.ord.to_s }
-        "sql_flame_#{ascii_sql}"
-      end
-  end
-
-  def object
-    codes = <<-HERE
-    class SQLFlame
-      def #{method_name}(function)
+    def run_sql(function)
+      if ENV['WITH_FLAME']
+        object.send method_name, function
+      else
         function.call
       end
     end
-    SQLFlame.new
-    HERE
 
-    eval codes
+    private
+
+    def method_name
+      @method_name ||=
+        begin
+          sql_statement = sql.respond_to?(:to_sql) ? sql.to_sql : sql
+          obfuscated_sql = NewRelic::Agent::Database.obfuscate_sql(sql_statement)
+          # .parameterize.underscore
+          ascii_sql = obfuscated_sql.gsub(/[^A-Za-z0-9]/) { |s| '_a' + s.ord.to_s }
+          "sql_flame_#{ascii_sql}"
+        end
+    end
+
+    def object
+      self.class.class_eval <<-CODE, __FILE__, __LINE__ + 1
+      def #{method_name}(function)
+        function.call
+      end
+      CODE
+
+      self
+    end
   end
 end
 
@@ -50,7 +49,7 @@ module ActiveRecord
           insert_without_flame(arel, name, pk, id_value, sequence_name, binds)
         end
 
-        sql_recorder = SQLRecorder.new(arel)
+        sql_recorder = Flamegraph::SQLRunner.new(arel)
         sql_recorder.run_sql function
       end
       alias_method_chain :insert, :flame
@@ -60,7 +59,7 @@ module ActiveRecord
           update_without_flame(arel, name, binds)
         end
 
-        sql_recorder = SQLRecorder.new(arel)
+        sql_recorder = Flamegraph::SQLRunner.new(arel)
         sql_recorder.run_sql function
       end
       alias_method_chain :update, :flame
@@ -70,7 +69,7 @@ module ActiveRecord
           delete_without_flame(arel, name, binds)
         end
 
-        sql_recorder = SQLRecorder.new(arel)
+        sql_recorder = Flamegraph::SQLRunner.new(arel)
         sql_recorder.run_sql function
       end
       alias_method_chain :delete, :flame
@@ -80,7 +79,7 @@ module ActiveRecord
           select_without_flame(sql, name, binds)
         end
 
-        sql_recorder = SQLRecorder.new(sql)
+        sql_recorder = Flamegraph::SQLRunner.new(sql)
         sql_recorder.run_sql function
       end
       alias_method_chain :select, :flame
