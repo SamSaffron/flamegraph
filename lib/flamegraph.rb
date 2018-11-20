@@ -22,7 +22,7 @@ require "flamegraph/renderer"
 require "flamegraph/sampler"
 
 begin
-  require "flamegraph/active_record_sql_recorder"
+  require "flamegraph/active_record_sql_recorder" if defined?(ActiveRecord)
 rescue
 end
 
