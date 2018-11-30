@@ -19,6 +19,10 @@ Or install it yourself as:
 
     $ gem install flamegraph
 
+NOTE: For ruby 2.1+ you'll need to install a [stackprof](https://github.com/tmm1/stackprof) gem:
+
+    $ gem install stackprof
+    
 ## Usage
 
 Note: Only supported on Ruby 2.0. Gathering stack traces is too slow on earlier versions of Ruby or JRuby
