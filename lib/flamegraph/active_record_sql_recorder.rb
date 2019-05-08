@@ -1,4 +1,5 @@
 require 'active_record/connection_adapters/abstract/database_statements'
+require 'newrelic_rpm'
 
 module Flamegraph
   class SQLRunner # :nodoc:
