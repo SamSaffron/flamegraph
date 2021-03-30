@@ -49,11 +49,12 @@ Flamegraph.generate(filename, hide_x_bottom_lines: 20) do
 end
 
 # will order stacktraces alphabetically, like the original Flamegraph (https://github.com/brendangregg/FlameGraph) does
-Flamegraph.generate(filename, sort_alphabetically: true) do
+Flamegraph.generate(filename, sort_alphabetically: true) do # TODO: consider https://gist.github.com/BrVer/9854d6fb5b9546987c49e0dcf8ead380 instead
   # your work here
 end
 
 ```
+
 
 ## Demo
 
